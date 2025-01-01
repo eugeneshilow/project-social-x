@@ -6,7 +6,7 @@ import puppeteer from "puppeteer";
 
 const CLAUDE_COOKIES_PATH = path.join(process.cwd(), "claude-cookies.json");
 
-// Now we’ll also type into the contenteditable area.
+// We'll insert the entire prompt at once, then press Enter.
 export async function fetchFromClaude(prompt: string): Promise<string> {
   console.log("[fetchFromClaude] Starting Puppeteer with prompt:", prompt);
 
@@ -31,7 +31,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     const page = await browser.newPage();
     console.log("[fetchFromClaude] New page created.");
 
-    // 1) Load cookies
+    // 1) Load cookies if we have them
     if (fs.existsSync(CLAUDE_COOKIES_PATH)) {
       console.log("[fetchFromClaude] Loading cookies from:", CLAUDE_COOKIES_PATH);
       const cookiesString = fs.readFileSync(CLAUDE_COOKIES_PATH, "utf-8");
@@ -42,42 +42,45 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       console.warn("[fetchFromClaude] No claude-cookies.json found.");
     }
 
-    // 2) Navigate to Claude
+    // 2) Go to Claude
     console.log("[fetchFromClaude] Navigating to claude.ai/new...");
     await page.goto("https://claude.ai/new", { waitUntil: "networkidle0" });
     console.log("[fetchFromClaude] Page loaded =>", await page.title());
 
-    // 3) If login button is present, session might be invalid
+    // 3) Check if logged in
     const loginButton = await page.$("button#login-button");
     if (loginButton) {
       console.log("[fetchFromClaude] Detected login button. Possibly invalid session.");
-      // Optionally throw an error or attempt login logic
+      // Possibly throw error or handle login here
     }
 
-    // 4) Type into the contenteditable input
-    console.log("[fetchFromClaude] Locating contenteditable input...");
+    // 4) Insert entire prompt text directly into contenteditable
     const contentEditableSelector = 'div[contenteditable="true"]';
+    console.log("[fetchFromClaude] Waiting for contenteditable...");
     await page.waitForSelector(contentEditableSelector, { timeout: 15000 });
-    const contentEditable = await page.$(contentEditableSelector);
 
-    if (!contentEditable) {
-      throw new Error("[fetchFromClaude] Couldn’t find the contenteditable input!");
-    }
+    console.log("[fetchFromClaude] Inserting prompt text all at once...");
+    await page.evaluate(
+      (selector, text) => {
+        const el = document.querySelector<HTMLElement>(selector);
+        if (!el) {
+          throw new Error("[fetchFromClaude] Couldn’t find the contenteditable input!");
+        }
 
-    console.log("[fetchFromClaude] Clicking contenteditable to focus...");
-    await contentEditable.click({ clickCount: 1, delay: 100 });
+        // Overwrite any existing text
+        el.innerText = text;
+      },
+      contentEditableSelector,
+      prompt
+    );
 
-    console.log("[fetchFromClaude] Typing prompt =>", prompt);
-    await page.keyboard.type(prompt, { delay: 20 }); // small delay for realism
-
-    // 5) Press Enter or click “Send” button (the below is placeholder logic).
+    // 5) Focus the field (optional) and press Enter to send
     console.log("[fetchFromClaude] Pressing Enter to submit...");
+    await page.focus(contentEditableSelector);
     await page.keyboard.press("Enter");
 
-    // 6) Wait for the response. This part depends on the real DOM structure.
-    // For now, we mock the answer.
+    // 6) Wait for response (placeholder)
     console.log("[fetchFromClaude] Waiting for Claude to respond... (placeholder)");
-    // e.g. await page.waitForSelector('.assistantMessage');
 
     // 7) Save cookies
     console.log("[fetchFromClaude] Saving cookies after browsing...");
@@ -85,8 +88,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     fs.writeFileSync(CLAUDE_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
     console.log("[fetchFromClaude] Cookies re-saved to claude-cookies.json");
 
-    // Return a mock string for demonstration.
-    // If you want to scrape the real reply, find the appropriate selector and extract textContent.
+    // Return a placeholder answer for demonstration.
     const answerText = `Claude response (mock) for prompt: ${prompt}`;
     return answerText;
   } catch (error) {
