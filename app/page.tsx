@@ -12,31 +12,25 @@ export default function HomePage() {
   const [chatGPTOutput, setChatGPTOutput] = useState("")
   const [claudeOutput, setClaudeOutput] = useState("")
   const [geminiOutput, setGeminiOutput] = useState("")
-
-  // Keep the existing dropdown for prompt template
   const [selectedPlatform, setSelectedPlatform] = useState<"threads" | "telegram">("threads")
 
-  // Called after user fills the form and clicks "Generate"
-  async function handleGenerate() {
-    console.log("[handleGenerate] Invoked with data:", {
-      referencePost,
-      info,
-      selectedModels,
-      selectedPlatform
-    })
+  // Instead of reading from state, we pass the newly updated data to handleGenerate
+  async function handleGenerate(formData: {
+    referencePost: string
+    info: string
+    selectedModels: string[]
+  }) {
+    console.log("[handleGenerate] Called with formData (latest user input):", formData)
 
     try {
-      // Call server action with the user’s inputs
       const result = await generateAction({
-        referencePost,
-        info,
-        selectedModels,
+        referencePost: formData.referencePost,
+        info: formData.info,
+        selectedModels: formData.selectedModels,
         selectedPlatform
       })
 
-      console.log("[handleGenerate] Server action result:", result)
-
-      // Update local states with the returned outputs
+      console.log("[handleGenerate] generateAction returned =>", result)
       setChatGPTOutput(result.chatGPTOutput)
       setClaudeOutput(result.claudeOutput)
       setGeminiOutput(result.geminiOutput)
@@ -50,23 +44,26 @@ export default function HomePage() {
     info: string
     selectedModels: string[]
   }) {
-    console.log("[handleOnGenerate] Received form data:", formData)
+    console.log("[handleOnGenerate] called with =>", formData)
+
+    // We update local state if we want the UI to reflect these changes (optional):
     setReferencePost(formData.referencePost)
     setInfo(formData.info)
     setSelectedModels(formData.selectedModels)
 
-    // Reset old outputs
+    // Clear existing outputs
     setChatGPTOutput("")
     setClaudeOutput("")
     setGeminiOutput("")
 
-    // Trigger the Puppeteer + LLM logic
-    void handleGenerate()
+    // Now pass formData directly to handleGenerate:
+    void handleGenerate(formData)
   }
 
   return (
     <div className="min-h-screen p-4 flex flex-col gap-8">
       <div className="max-w-2xl mx-auto w-full p-4 border rounded-md shadow-sm">
+
         <h1 className="text-xl font-bold mb-4">Automated Post Generation</h1>
 
         <div className="mb-4">
