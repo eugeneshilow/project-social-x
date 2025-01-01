@@ -18,11 +18,19 @@ export async function generateAction({
   selectedModels,
   selectedPlatform
 }: GenerateParams) {
+  console.log("[generateAction] Received data:", {
+    referencePost,
+    info,
+    selectedModels,
+    selectedPlatform
+  })
+
   // 1. Choose system prompt
   const systemPrompt = selectedPlatform === "threads" ? threadsPrompt : telegramPrompt
 
   // 2. Build final prompt
   const finalPrompt = buildPrompt(systemPrompt, referencePost, info)
+  console.log("[generateAction] Final prompt built:", finalPrompt)
 
   let chatGPTOutput = ""
   let claudeOutput = ""
@@ -35,7 +43,9 @@ export async function generateAction({
 
   // Claude (via Puppeteer)
   if (selectedModels.includes("claude")) {
+    console.log("[generateAction] Calling Puppeteer fetchFromClaude...")
     claudeOutput = await fetchFromClaude(finalPrompt)
+    console.log("[generateAction] Puppeteer returned for Claude:", claudeOutput)
   }
 
   // Gemini (placeholder)

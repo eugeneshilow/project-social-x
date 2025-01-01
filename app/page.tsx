@@ -18,18 +18,31 @@ export default function HomePage() {
 
   // Called after user fills the form and clicks "Generate"
   async function handleGenerate() {
-    // Call server action with the user’s inputs
-    const result = await generateAction({
+    console.log("[handleGenerate] Invoked with data:", {
       referencePost,
       info,
       selectedModels,
       selectedPlatform
     })
 
-    // Update local states with the returned outputs
-    setChatGPTOutput(result.chatGPTOutput)
-    setClaudeOutput(result.claudeOutput)
-    setGeminiOutput(result.geminiOutput)
+    try {
+      // Call server action with the user’s inputs
+      const result = await generateAction({
+        referencePost,
+        info,
+        selectedModels,
+        selectedPlatform
+      })
+
+      console.log("[handleGenerate] Server action result:", result)
+
+      // Update local states with the returned outputs
+      setChatGPTOutput(result.chatGPTOutput)
+      setClaudeOutput(result.claudeOutput)
+      setGeminiOutput(result.geminiOutput)
+    } catch (err) {
+      console.error("[handleGenerate] Error calling generateAction:", err)
+    }
   }
 
   function handleOnGenerate(formData: {
@@ -37,6 +50,7 @@ export default function HomePage() {
     info: string
     selectedModels: string[]
   }) {
+    console.log("[handleOnGenerate] Received form data:", formData)
     setReferencePost(formData.referencePost)
     setInfo(formData.info)
     setSelectedModels(formData.selectedModels)
