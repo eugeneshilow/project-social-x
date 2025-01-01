@@ -32,6 +32,15 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       ]
     });
     console.log("[fetchFromClaude] Browser launched successfully.");
+
+    // NEW LINE: Override clipboard permissions for claude.ai
+    console.log("[fetchFromClaude] Overriding permissions for claude.ai...");
+    await browser.defaultBrowserContext().overridePermissions("https://claude.ai", [
+      "clipboard-read",
+      "clipboard-write"
+    ]);
+    console.log("[fetchFromClaude] Clipboard permissions granted.");
+
   } catch (error) {
     console.error("[fetchFromClaude] Error launching Puppeteer:", error);
     throw error;
