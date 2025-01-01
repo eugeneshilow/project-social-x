@@ -42,10 +42,13 @@ export async function generateAction({
   }
 
   // Claude (via Puppeteer)
+  // Ensure user selected "claude"
   if (selectedModels.includes("claude")) {
-    console.log("[generateAction] Calling Puppeteer fetchFromClaude...")
+    console.log("[generateAction] User selected Claude, calling fetchFromClaude...")
     claudeOutput = await fetchFromClaude(finalPrompt)
     console.log("[generateAction] Puppeteer returned for Claude:", claudeOutput)
+  } else {
+    console.log("[generateAction] Claude NOT selected, skipping Puppeteer call.")
   }
 
   // Gemini (placeholder)

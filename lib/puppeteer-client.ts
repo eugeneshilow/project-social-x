@@ -15,12 +15,21 @@ const CLAUDE_COOKIES_PATH = path.join(process.cwd(), "claude-cookies.json");
 export async function fetchFromClaude(prompt: string): Promise<string> {
   console.log("[fetchFromClaude] Starting Puppeteer with prompt:", prompt);
 
-  // 1) Launch a browser (headless: false if you want to watch the browser)
   let browser;
   try {
+    // IMPORTANT: Use non-headless Chrome with some extra args so it can open properly on many systems
+    console.log("[fetchFromClaude] Launching Puppeteer (non-headless)...");
     browser = await puppeteer.launch({
       headless: false,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-blink-features=AutomationControlled",
+      ],
+      // If you have a custom local Chrome path, you can specify executablePath here:
+      // executablePath: "/usr/bin/google-chrome",
     });
+
     console.log("[fetchFromClaude] Browser launched.");
   } catch (launchError) {
     console.error("[fetchFromClaude] Error launching puppeteer:", launchError);
@@ -47,11 +56,11 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     await page.goto("https://claude.ai/new", { waitUntil: "networkidle0" });
     console.log("[fetchFromClaude] Page loaded:", await page.title());
 
-    // 4) Check if you are logged in by looking for something that only appears when logged in.
+    // 4) Check if you are logged in
     const loginButton = await page.$("button#login-button");
     if (loginButton) {
       console.log("[fetchFromClaude] Detected login button. Session may be invalid or expired.");
-      // For real usage, handle login or throw an error
+      // For real usage, you'd handle login or throw an error
     }
 
     // 5) Interact with the prompt box (this is placeholder logic).
