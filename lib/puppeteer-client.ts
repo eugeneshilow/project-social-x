@@ -16,7 +16,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
 
   let browser: puppeteer.Browser | undefined;
   try {
-    console.log("[fetchFromClaude] Launching Puppeteer...");
+    console.log("[fetchFromClaude] Launching Puppeteer (non-headless)...");
     browser = await puppeteer.launch({
       headless: false,
       args: [
@@ -35,7 +35,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     const page = await browser.newPage();
     console.log("[fetchFromClaude] New page created.");
 
-    // 1) Load cookies if they exist
+    // 1) Load cookies if present
     if (fs.existsSync(CLAUDE_COOKIES_PATH)) {
       console.log("[fetchFromClaude] Loading cookies from:", CLAUDE_COOKIES_PATH);
       const cookiesString = fs.readFileSync(CLAUDE_COOKIES_PATH, "utf-8");
@@ -46,7 +46,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       console.warn("[fetchFromClaude] No claude-cookies.json found.");
     }
 
-    // 2) Navigate to claude.ai
+    // 2) Go to Claude
     console.log("[fetchFromClaude] Navigating to claude.ai/new...");
     await page.goto("https://claude.ai/new", { waitUntil: "networkidle0" });
     console.log("[fetchFromClaude] Page loaded =>", await page.title());
@@ -58,7 +58,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       // Potentially handle login or throw an error
     }
 
-    // 4) Type the prompt
+    // 4) Insert prompt
     const contentEditableSelector = 'div[contenteditable="true"]';
     console.log("[fetchFromClaude] Waiting for contenteditable...");
     await page.waitForSelector(contentEditableSelector, { timeout: 15000 });
@@ -70,8 +70,8 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       el.innerText = txt;
     }, contentEditableSelector, prompt);
 
-    // 5) Count old messages
-    const messageSelector = ".Thread__StyledThread-sc-cxyyn5-0 .ChatMessage__StyledChatMessage";
+    // 5) Count old messages: use "div.font-claude-message p"
+    const messageSelector = "div.font-claude-message p";
     const oldCount = await page.$$eval(messageSelector, (msgs) => msgs.length);
     console.log("[fetchFromClaude] oldCount =", oldCount);
 
@@ -80,11 +80,11 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     await page.focus(contentEditableSelector);
     await page.keyboard.press("Enter");
 
-    // 6) Poll for new messages in a 2-minute max
+    // 6) Poll for new messages (2 minutes total)
     console.log("[fetchFromClaude] Polling for new messages up to 2 minutes...");
 
     let newCount = oldCount;
-    const maxTries = 60; // 60 tries x 2 seconds = 120s
+    const maxTries = 60; // each try is 2s => 120s total
     for (let i = 0; i < maxTries; i++) {
       await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2s
       newCount = await page.$$eval(messageSelector, (msgs) => msgs.length);
@@ -98,7 +98,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       return "";
     }
 
-    // 8) Get text of the last message
+    // 8) Get the last message's text
     const lastResponse = await page.evaluate((sel) => {
       const msgs = document.querySelectorAll(sel);
       const lastMsg = msgs[msgs.length - 1] as HTMLElement | null;
