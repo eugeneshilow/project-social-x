@@ -4,20 +4,14 @@ import fs from "fs";
 import path from "path";
 import puppeteer from "puppeteer";
 
-/**
- * A sample Puppeteer client to fetch responses from Claude web UI.
- * This uses cookies from claude-cookies.json to skip the login flow.
- */
-
 const CLAUDE_COOKIES_PATH = path.join(process.cwd(), "claude-cookies.json");
 
-// This function returns the entire response text from Claude (mock placeholders).
+// Now we’ll also type into the contenteditable area.
 export async function fetchFromClaude(prompt: string): Promise<string> {
   console.log("[fetchFromClaude] Starting Puppeteer with prompt:", prompt);
 
   let browser;
   try {
-    // IMPORTANT: Use non-headless Chrome with some extra args so it can open properly on many systems
     console.log("[fetchFromClaude] Launching Puppeteer (non-headless)...");
     browser = await puppeteer.launch({
       headless: false,
@@ -26,13 +20,10 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
         "--disable-setuid-sandbox",
         "--disable-blink-features=AutomationControlled",
       ],
-      // If you have a custom local Chrome path, you can specify executablePath here:
-      // executablePath: "/usr/bin/google-chrome",
     });
-
     console.log("[fetchFromClaude] Browser launched.");
   } catch (launchError) {
-    console.error("[fetchFromClaude] Error launching puppeteer:", launchError);
+    console.error("[fetchFromClaude] Error launching Puppeteer:", launchError);
     throw launchError;
   }
 
@@ -40,7 +31,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     const page = await browser.newPage();
     console.log("[fetchFromClaude] New page created.");
 
-    // 2) Load cookies from claude-cookies.json if available
+    // 1) Load cookies
     if (fs.existsSync(CLAUDE_COOKIES_PATH)) {
       console.log("[fetchFromClaude] Loading cookies from:", CLAUDE_COOKIES_PATH);
       const cookiesString = fs.readFileSync(CLAUDE_COOKIES_PATH, "utf-8");
@@ -48,43 +39,55 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       await page.setCookie(...parsedCookies);
       console.log("[fetchFromClaude] Cookies set on page.");
     } else {
-      console.warn("[fetchFromClaude] No claude-cookies.json found, might need to log in manually.");
+      console.warn("[fetchFromClaude] No claude-cookies.json found.");
     }
 
-    // 3) Go directly to Claude's interface. This domain must match your cookie domain.
-    console.log("[fetchFromClaude] Navigating to claude.ai/new ...");
+    // 2) Navigate to Claude
+    console.log("[fetchFromClaude] Navigating to claude.ai/new...");
     await page.goto("https://claude.ai/new", { waitUntil: "networkidle0" });
-    console.log("[fetchFromClaude] Page loaded:", await page.title());
+    console.log("[fetchFromClaude] Page loaded =>", await page.title());
 
-    // 4) Check if you are logged in
+    // 3) If login button is present, session might be invalid
     const loginButton = await page.$("button#login-button");
     if (loginButton) {
-      console.log("[fetchFromClaude] Detected login button. Session may be invalid or expired.");
-      // For real usage, you'd handle login or throw an error
+      console.log("[fetchFromClaude] Detected login button. Possibly invalid session.");
+      // Optionally throw an error or attempt login logic
     }
 
-    // 5) Interact with the prompt box (this is placeholder logic).
-    console.log("[fetchFromClaude] Typing prompt (placeholder logic).");
-    // For example:
-    // await page.type("textarea.someSelector", prompt);
-    // await page.click("button.submitPrompt");
+    // 4) Type into the contenteditable input
+    console.log("[fetchFromClaude] Locating contenteditable input...");
+    const contentEditableSelector = 'div[contenteditable="true"]';
+    await page.waitForSelector(contentEditableSelector, { timeout: 15000 });
+    const contentEditable = await page.$(contentEditableSelector);
 
-    // 6) Wait for answer (placeholder)
-    // For example:
-    // await page.waitForSelector(".assistantMessage", { timeout: 15000 });
-    // const assistantMessage = await page.$(".assistantMessage");
-    // const answerText = await page.evaluate(el => el.textContent, assistantMessage);
+    if (!contentEditable) {
+      throw new Error("[fetchFromClaude] Couldn’t find the contenteditable input!");
+    }
 
-    // Mock the answer for now
-    const answerText = `Claude response (mock) for prompt: ${prompt}`;
+    console.log("[fetchFromClaude] Clicking contenteditable to focus...");
+    await contentEditable.click({ clickCount: 1, delay: 100 });
 
-    // 7) Optionally re-save cookies if they changed
+    console.log("[fetchFromClaude] Typing prompt =>", prompt);
+    await page.keyboard.type(prompt, { delay: 20 }); // small delay for realism
+
+    // 5) Press Enter or click “Send” button (the below is placeholder logic).
+    console.log("[fetchFromClaude] Pressing Enter to submit...");
+    await page.keyboard.press("Enter");
+
+    // 6) Wait for the response. This part depends on the real DOM structure.
+    // For now, we mock the answer.
+    console.log("[fetchFromClaude] Waiting for Claude to respond... (placeholder)");
+    // e.g. await page.waitForSelector('.assistantMessage');
+
+    // 7) Save cookies
     console.log("[fetchFromClaude] Saving cookies after browsing...");
     const currentCookies = await page.cookies();
     fs.writeFileSync(CLAUDE_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
     console.log("[fetchFromClaude] Cookies re-saved to claude-cookies.json");
 
-    console.log("[fetchFromClaude] Returning mock answer text.");
+    // Return a mock string for demonstration.
+    // If you want to scrape the real reply, find the appropriate selector and extract textContent.
+    const answerText = `Claude response (mock) for prompt: ${prompt}`;
     return answerText;
   } catch (error) {
     console.error("[fetchFromClaude] Error while fetching from Claude:", error);
