@@ -2,6 +2,7 @@
 
 import fs from "fs";
 import path from "path";
+import type { Browser, Page } from "puppeteer";
 import puppeteer from "puppeteer";
 
 const CLAUDE_COOKIES_PATH = path.join(process.cwd(), "claude-cookies.json");
@@ -19,7 +20,7 @@ const CLAUDE_COOKIES_PATH = path.join(process.cwd(), "claude-cookies.json");
 export async function fetchFromClaude(prompt: string): Promise<string> {
   console.log("[fetchFromClaude] Starting Puppeteer with prompt:\n", prompt);
 
-  let browser: puppeteer.Browser | undefined;
+  let browser: Browser | undefined;
   try {
     console.log("[fetchFromClaude] Launching Puppeteer (non-headless)...");
     browser = await puppeteer.launch({
@@ -60,7 +61,6 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     const loginButton = await page.$("button#login-button");
     if (loginButton) {
       console.error("[fetchFromClaude] Possibly not logged in (login button detected).");
-      // Could handle login here or throw
     }
 
     // 4) Insert prompt
@@ -69,7 +69,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     await page.waitForSelector(contentEditableSelector, { timeout: 15000 });
 
     console.log("[fetchFromClaude] Typing prompt...");
-    await page.evaluate((selector, txt) => {
+    await page.evaluate((selector: string, txt: string) => {
       const el = document.querySelector<HTMLElement>(selector);
       if (!el) throw new Error("[fetchFromClaude] contenteditable not found!");
       el.innerText = txt;
@@ -79,7 +79,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     const messageContainerSelector = "div.font-claude-message";
 
     // 5) Count old messages
-    const oldCount = await page.$$eval(messageContainerSelector, (msgs) => msgs.length);
+    const oldCount = await page.$$eval(messageContainerSelector, (msgs: Element[]) => msgs.length);
     console.log("[fetchFromClaude] oldCount =", oldCount);
 
     // Press Enter
@@ -94,7 +94,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
 
     for (let i = 0; i < maxNewMsgTries; i++) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      newCount = await page.$$eval(messageContainerSelector, (msgs) => msgs.length);
+      newCount = await page.$$eval(messageContainerSelector, (msgs: Element[]) => msgs.length);
       console.log(`[fetchFromClaude] Check #${i + 1}: newCount=${newCount} oldCount=${oldCount}`);
       if (newCount > oldCount) {
         console.log("[fetchFromClaude] Found a new message container, waiting for streaming to finish...");
@@ -110,7 +110,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     const maxStreamTries = 30; // up to ~60s
     for (let j = 0; j < maxStreamTries; j++) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      const stillStreaming = await page.$$eval('div[data-is-streaming="true"]', (els) => els.length);
+      const stillStreaming = await page.$$eval('div[data-is-streaming="true"]', (els: Element[]) => els.length);
       console.log(`[fetchFromClaude] Stream check #${j + 1}: stillStreamingCount=${stillStreaming}`);
       if (stillStreaming === 0) {
         console.log("[fetchFromClaude] data-is-streaming=false => message is complete!");
@@ -122,53 +122,96 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     console.log("[fetchFromClaude] Pausing 2s so copy button can appear...");
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // 9) Attempt up to 5 times (1s each) to find/click the "Copy" button in the last container
     let finalAnswer = "";
     const maxButtonTries = 5;
-    for (let k = 0; k < maxButtonTries; k++) {
-      const containerHandles = await page.$$(messageContainerSelector);
-      const lastContainer = containerHandles[containerHandles.length - 1];
-      if (!lastContainer) {
-        console.warn("[fetchFromClaude] Could not find the last message container!");
-        break;
-      }
 
-      // We'll do a direct approach: check all 'button' elements for textContent == 'Copy'
-      const buttons = await lastContainer.$$("button");
-      let copyButtonFound = false;
-      for (const btn of buttons) {
-        const btnText = await btn.evaluate((el) => el.textContent?.trim() || "");
-        if (btnText === "Copy") {
-          console.log("[fetchFromClaude] Found the Copy button, clicking it now...");
-          await btn.click();
+    const containerHandles = await page.$$(messageContainerSelector);
+    const lastContainer = containerHandles[containerHandles.length - 1];
+    if (!lastContainer) {
+      console.warn("[fetchFromClaude] Could not find the last message container!");
+      finalAnswer = await lastMessageTextFallback(page, messageContainerSelector);
+    } else {
+      for (let k = 0; k < maxButtonTries; k++) {
+        console.log(`[fetchFromClaude] Copy button detection attempt #${k + 1}`);
+        
+        try {
+          // Wait for the button to be fully loaded
+          await new Promise(resolve => setTimeout(resolve, 2000));
 
-          // Now read from clipboard
-          console.log("[fetchFromClaude] Reading from navigator.clipboard...");
-          finalAnswer = await page.evaluate(async () => {
-            return await navigator.clipboard.readText();
+          // Try to find and click the copy button using XPath
+          const clicked = await lastContainer.evaluate((container) => {
+            // The exact XPath for the copy button
+            const COPY_BUTTON_XPATH = '/html/body/div[3]/div/div/div[2]/div[1]/div[1]/div[2]/div/div/div[2]/div/div/div[1]/button[1]';
+            
+            // Try XPath first
+            const result = document.evaluate(
+              COPY_BUTTON_XPATH,
+              document,
+              null,
+              XPathResult.FIRST_ORDERED_NODE_TYPE,
+              null
+            );
+            
+            const copyButton = result.singleNodeValue as HTMLButtonElement;
+            if (copyButton) {
+              copyButton.click();
+              return true;
+            }
+
+            // Fallback: try to find by SVG content
+            const buttons = Array.from(container.querySelectorAll('button'));
+            const fallbackButton = buttons.find(btn => {
+              const svg = btn.querySelector('svg[viewBox="0 0 256 256"]');
+              const path = btn.querySelector('path[d^="M200,32H163.74"]');
+              return svg && path && btn.textContent?.includes('Copy');
+            });
+
+            if (fallbackButton) {
+              fallbackButton.click();
+              return true;
+            }
+
+            return false;
           });
 
-          console.log("[fetchFromClaude] finalAnswer from clipboard =>\n", finalAnswer);
-          copyButtonFound = true;
-          break;
+          if (clicked) {
+            // Wait for clipboard
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Try to get clipboard content
+            finalAnswer = await page.evaluate(async () => {
+              try {
+                return await navigator.clipboard.readText();
+              } catch (e) {
+                return '';
+              }
+            });
+
+            if (finalAnswer && finalAnswer.length > 10) {
+              console.log("[fetchFromClaude] Successfully got text from clipboard");
+              break;
+            }
+          } else {
+            console.log("[fetchFromClaude] Copy button not found, retrying...");
+          }
+
+          // Wait before next attempt
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+        } catch (e) {
+          console.error("[fetchFromClaude] Error in copy attempt:", e);
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
 
-      if (copyButtonFound) {
-        break;
-      } else {
-        console.log(`[fetchFromClaude] Try #${k + 1}: No copy button found, waiting 1s...`);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+      // If clipboard methods failed, fall back to direct text extraction
+      if (!finalAnswer) {
+        console.log("[fetchFromClaude] All clipboard attempts failed, falling back to text extraction...");
+        finalAnswer = await lastMessageTextFallback(page, messageContainerSelector);
       }
     }
 
-    // If for some reason finalAnswer is still empty, we’ll try a fallback: get text from DOM
-    if (!finalAnswer) {
-      console.warn("[fetchFromClaude] Copy button not found or copy failed; trying fallback...");
-      finalAnswer = await lastMessageTextFallback(page, messageContainerSelector);
-    }
-
-    // 10) Save cookies
+    // 9) Save cookies
     console.log("[fetchFromClaude] Saving cookies...");
     const currentCookies = await page.cookies();
     fs.writeFileSync(CLAUDE_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
@@ -189,25 +232,53 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
 
 /**
  * lastMessageTextFallback
- * If we fail to find/click the copy button, as a fallback we can scrape the text from the last message container.
+ * If we fail to click the correct button, we scrape text from the last message container as fallback.
  */
 async function lastMessageTextFallback(
-  page: puppeteer.Page,
+  page: Page,
   messageContainerSelector: string
 ): Promise<string> {
   try {
     const containerHandles = await page.$$(messageContainerSelector);
     const lastContainer = containerHandles[containerHandles.length - 1];
     if (!lastContainer) {
-      console.warn("[lastMessageTextFallback] Could not find the last message container!");
+      console.warn("[lastMessageTextFallback] No container found!");
       return "";
     }
 
-    const fallbackText = await lastContainer.evaluate((node) => node.innerText.trim());
-    console.log("[lastMessageTextFallback] Fallback text =>\n", fallbackText);
-    return fallbackText;
+    return await lastContainer.evaluate((container) => {
+      const cleanText = (text: string) => {
+        return text
+          .replace(/\s+/g, ' ')
+          .replace(/\n+/g, '\n')
+          .trim();
+      };
+
+      const selectors = [
+        '[data-message-author-role="assistant"]',
+        '[data-message-content="true"]',
+        '.prose',
+        '.whitespace-pre-wrap',
+      ];
+
+      for (const selector of selectors) {
+        const element = container.querySelector(selector);
+        if (element) {
+          const clone = element.cloneNode(true) as Element;
+          clone.querySelectorAll('button, svg, .copy-button, [role="button"], [data-message-author-role="user"]').forEach(el => el.remove());
+          const text = cleanText(clone.textContent || '');
+          if (text && !text.includes('svg') && !text.includes('xmlns') && text.length > 10) {
+            return text;
+          }
+        }
+      }
+
+      const clone = container.cloneNode(true) as Element;
+      clone.querySelectorAll('button, svg, .copy-button, [role="button"], [data-message-author-role="user"]').forEach(el => el.remove());
+      return cleanText(clone.textContent || '');
+    });
   } catch (error) {
-    console.error("[lastMessageTextFallback] Error scraping last message text:", error);
+    console.error("[lastMessageTextFallback] Error:", error);
     return "";
   }
 }
