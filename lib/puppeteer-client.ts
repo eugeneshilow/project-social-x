@@ -12,7 +12,7 @@ import puppeteer from "puppeteer";
 export async function fetchFromChatGPT(prompt: string): Promise<string> {
   // Launch a headless browser
   const browser = await puppeteer.launch({
-    headless: "new", // or true
+    headless: false, // Changed from "false" to false
   });
 
   try {
