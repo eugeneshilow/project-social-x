@@ -14,7 +14,7 @@ const CLAUDE_COOKIES_PATH = path.join(process.cwd(), "claude-cookies.json");
  * 4. Wait until streaming ends
  * 5. Pause briefly, then look for the copy button
  * 6. Click it, read the clipboard
- * 7. Return the text
+ * 7. Return the text (paste into output)
  */
 export async function fetchFromClaude(prompt: string): Promise<string> {
   console.log("[fetchFromClaude] Starting Puppeteer with prompt:\n", prompt);
@@ -28,8 +28,6 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-blink-features=AutomationControlled"
-        // If needed for clipboard:
-        // "--enable-features=ClipboardReadWrite"
       ]
     });
     console.log("[fetchFromClaude] Browser launched successfully.");
@@ -62,7 +60,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     const loginButton = await page.$("button#login-button");
     if (loginButton) {
       console.error("[fetchFromClaude] Possibly not logged in (login button detected).");
-      // Potentially handle login or throw an error
+      // Could handle login here or throw
     }
 
     // 4) Insert prompt
@@ -124,11 +122,10 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     console.log("[fetchFromClaude] Pausing 2s so copy button can appear...");
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // 9) Attempt up to 5 times (1s each) to find/click the copy button in the last container
+    // 9) Attempt up to 5 times (1s each) to find/click the "Copy" button in the last container
     let finalAnswer = "";
     const maxButtonTries = 5;
     for (let k = 0; k < maxButtonTries; k++) {
-      // Re-grab last container
       const containerHandles = await page.$$(messageContainerSelector);
       const lastContainer = containerHandles[containerHandles.length - 1];
       if (!lastContainer) {
@@ -136,29 +133,28 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
         break;
       }
 
-      // We can try to find a button with text "Copy" or the same SVG icon
-      // We'll do a more direct approach: check all 'button' elements, see if they contain "Copy"
-      const buttonHandles = await lastContainer.$$("button");
-      let copyButton = null;
-      for (const b of buttonHandles) {
-        const innerText = await b.evaluate((el) => el.innerText.trim());
-        if (innerText.toLowerCase() === "copy") {
-          copyButton = b;
+      // We'll do a direct approach: check all 'button' elements for textContent == 'Copy'
+      const buttons = await lastContainer.$$("button");
+      let copyButtonFound = false;
+      for (const btn of buttons) {
+        const btnText = await btn.evaluate((el) => el.textContent?.trim() || "");
+        if (btnText === "Copy") {
+          console.log("[fetchFromClaude] Found the Copy button, clicking it now...");
+          await btn.click();
+
+          // Now read from clipboard
+          console.log("[fetchFromClaude] Reading from navigator.clipboard...");
+          finalAnswer = await page.evaluate(async () => {
+            return await navigator.clipboard.readText();
+          });
+
+          console.log("[fetchFromClaude] finalAnswer from clipboard =>\n", finalAnswer);
+          copyButtonFound = true;
           break;
         }
       }
 
-      if (copyButton) {
-        console.log("[fetchFromClaude] Found the Copy button, clicking it now...");
-        await copyButton.click();
-
-        // Now read from clipboard
-        console.log("[fetchFromClaude] Reading from navigator.clipboard...");
-        finalAnswer = await page.evaluate(async () => {
-          return await navigator.clipboard.readText();
-        });
-
-        console.log("[fetchFromClaude] finalAnswer from clipboard =>\n", finalAnswer);
+      if (copyButtonFound) {
         break;
       } else {
         console.log(`[fetchFromClaude] Try #${k + 1}: No copy button found, waiting 1s...`);
@@ -166,13 +162,16 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       }
     }
 
+    // If for some reason finalAnswer is still empty, we’ll try a fallback: get text from DOM
+    if (!finalAnswer) {
+      console.warn("[fetchFromClaude] Copy button not found or copy failed; trying fallback...");
+      finalAnswer = await lastMessageTextFallback(page, messageContainerSelector);
+    }
+
     // 10) Save cookies
     console.log("[fetchFromClaude] Saving cookies...");
     const currentCookies = await page.cookies();
-    fs.writeFileSync(
-      CLAUDE_COOKIES_PATH,
-      JSON.stringify(currentCookies, null, 2)
-    );
+    fs.writeFileSync(CLAUDE_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
     console.log("[fetchFromClaude] Cookies saved to claude-cookies.json");
 
     return finalAnswer || "";
@@ -185,5 +184,30 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       await browser.close();
       console.log("[fetchFromClaude] Browser closed.");
     }
+  }
+}
+
+/**
+ * lastMessageTextFallback
+ * If we fail to find/click the copy button, as a fallback we can scrape the text from the last message container.
+ */
+async function lastMessageTextFallback(
+  page: puppeteer.Page,
+  messageContainerSelector: string
+): Promise<string> {
+  try {
+    const containerHandles = await page.$$(messageContainerSelector);
+    const lastContainer = containerHandles[containerHandles.length - 1];
+    if (!lastContainer) {
+      console.warn("[lastMessageTextFallback] Could not find the last message container!");
+      return "";
+    }
+
+    const fallbackText = await lastContainer.evaluate((node) => node.innerText.trim());
+    console.log("[lastMessageTextFallback] Fallback text =>\n", fallbackText);
+    return fallbackText;
+  } catch (error) {
+    console.error("[lastMessageTextFallback] Error scraping last message text:", error);
+    return "";
   }
 }
