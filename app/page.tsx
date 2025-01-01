@@ -6,8 +6,8 @@ import OutputsSection from "./_components/outputs-section"
 
 // We'll import the prompt-builder and the system prompts
 import { buildPrompt } from "@/lib/prompt-builder"
-import { threadsPrompt } from "@/prompts/threads-prompt"
 import { telegramPrompt } from "@/prompts/telegram-prompt"
+import { threadsPrompt } from "@/prompts/threads-prompt"
 
 export default function HomePage() {
   const [referencePost, setReferencePost] = useState("")
