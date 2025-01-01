@@ -6,32 +6,36 @@ import puppeteer from "puppeteer";
 
 const CLAUDE_COOKIES_PATH = path.join(process.cwd(), "claude-cookies.json");
 
-// We'll insert the entire prompt at once, then press Enter.
+/**
+ * fetchFromClaude
+ * Launches Puppeteer, navigates to Claude, inserts user prompt,
+ * waits for new message, returns the last message's text.
+ */
 export async function fetchFromClaude(prompt: string): Promise<string> {
-  console.log("[fetchFromClaude] Starting Puppeteer with prompt:", prompt);
+  console.log("[fetchFromClaude] Starting Puppeteer with prompt:\n", prompt);
 
-  let browser;
+  let browser: puppeteer.Browser | undefined;
   try {
-    console.log("[fetchFromClaude] Launching Puppeteer (non-headless)...");
+    console.log("[fetchFromClaude] Launching Puppeteer...");
     browser = await puppeteer.launch({
       headless: false,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-blink-features=AutomationControlled",
-      ],
+        "--disable-blink-features=AutomationControlled"
+      ]
     });
-    console.log("[fetchFromClaude] Browser launched.");
-  } catch (launchError) {
-    console.error("[fetchFromClaude] Error launching Puppeteer:", launchError);
-    throw launchError;
+    console.log("[fetchFromClaude] Browser launched successfully.");
+  } catch (error) {
+    console.error("[fetchFromClaude] Error launching Puppeteer:", error);
+    throw error;
   }
 
   try {
     const page = await browser.newPage();
     console.log("[fetchFromClaude] New page created.");
 
-    // 1) Load cookies if we have them
+    // 1) Load cookies if they exist
     if (fs.existsSync(CLAUDE_COOKIES_PATH)) {
       console.log("[fetchFromClaude] Loading cookies from:", CLAUDE_COOKIES_PATH);
       const cookiesString = fs.readFileSync(CLAUDE_COOKIES_PATH, "utf-8");
@@ -42,7 +46,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       console.warn("[fetchFromClaude] No claude-cookies.json found.");
     }
 
-    // 2) Go to Claude
+    // 2) Navigate to claude.ai
     console.log("[fetchFromClaude] Navigating to claude.ai/new...");
     await page.goto("https://claude.ai/new", { waitUntil: "networkidle0" });
     console.log("[fetchFromClaude] Page loaded =>", await page.title());
@@ -50,52 +54,71 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     // 3) Check if logged in
     const loginButton = await page.$("button#login-button");
     if (loginButton) {
-      console.log("[fetchFromClaude] Detected login button. Possibly invalid session.");
-      // Possibly throw error or handle login here
+      console.error("[fetchFromClaude] Possibly not logged in (login button detected).");
+      // Potentially handle login or throw an error
     }
 
-    // 4) Insert entire prompt text directly into contenteditable
+    // 4) Type the prompt
     const contentEditableSelector = 'div[contenteditable="true"]';
     console.log("[fetchFromClaude] Waiting for contenteditable...");
     await page.waitForSelector(contentEditableSelector, { timeout: 15000 });
 
-    console.log("[fetchFromClaude] Inserting prompt text all at once...");
-    await page.evaluate(
-      (selector, text) => {
-        const el = document.querySelector<HTMLElement>(selector);
-        if (!el) {
-          throw new Error("[fetchFromClaude] Couldn’t find the contenteditable input!");
-        }
+    console.log("[fetchFromClaude] Typing prompt...");
+    await page.evaluate((selector, txt) => {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (!el) throw new Error("[fetchFromClaude] contenteditable not found!");
+      el.innerText = txt;
+    }, contentEditableSelector, prompt);
 
-        // Overwrite any existing text
-        el.innerText = text;
-      },
-      contentEditableSelector,
-      prompt
-    );
+    // 5) Count old messages
+    const messageSelector = ".Thread__StyledThread-sc-cxyyn5-0 .ChatMessage__StyledChatMessage";
+    const oldCount = await page.$$eval(messageSelector, (msgs) => msgs.length);
+    console.log("[fetchFromClaude] oldCount =", oldCount);
 
-    // 5) Focus the field (optional) and press Enter to send
-    console.log("[fetchFromClaude] Pressing Enter to submit...");
+    // Press Enter
+    console.log("[fetchFromClaude] Pressing Enter to submit prompt...");
     await page.focus(contentEditableSelector);
     await page.keyboard.press("Enter");
 
-    // 6) Wait for response (placeholder)
-    console.log("[fetchFromClaude] Waiting for Claude to respond... (placeholder)");
+    // 6) Poll for new messages in a 2-minute max
+    console.log("[fetchFromClaude] Polling for new messages up to 2 minutes...");
 
-    // 7) Save cookies
-    console.log("[fetchFromClaude] Saving cookies after browsing...");
+    let newCount = oldCount;
+    const maxTries = 60; // 60 tries x 2 seconds = 120s
+    for (let i = 0; i < maxTries; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2s
+      newCount = await page.$$eval(messageSelector, (msgs) => msgs.length);
+      console.log(`[fetchFromClaude] Try #${i + 1}: newCount=${newCount} oldCount=${oldCount}`);
+      if (newCount > oldCount) break;
+    }
+
+    // 7) If no new message, return empty
+    if (newCount <= oldCount) {
+      console.warn("[fetchFromClaude] Timed out or no new messages arrived from Claude.");
+      return "";
+    }
+
+    // 8) Get text of the last message
+    const lastResponse = await page.evaluate((sel) => {
+      const msgs = document.querySelectorAll(sel);
+      const lastMsg = msgs[msgs.length - 1] as HTMLElement | null;
+      return lastMsg?.innerText.trim() || "";
+    }, messageSelector);
+
+    console.log("[fetchFromClaude] lastResponse:\n", lastResponse);
+
+    // 9) Save cookies
     const currentCookies = await page.cookies();
     fs.writeFileSync(CLAUDE_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
-    console.log("[fetchFromClaude] Cookies re-saved to claude-cookies.json");
+    console.log("[fetchFromClaude] Cookies saved to claude-cookies.json");
 
-    // Return a placeholder answer for demonstration.
-    const answerText = `Claude response (mock) for prompt: ${prompt}`;
-    return answerText;
+    return lastResponse;
   } catch (error) {
-    console.error("[fetchFromClaude] Error while fetching from Claude:", error);
+    console.error("[fetchFromClaude] Error:", error);
     throw error;
   } finally {
     if (browser) {
+      console.log("[fetchFromClaude] Closing browser...");
       await browser.close();
       console.log("[fetchFromClaude] Browser closed.");
     }
