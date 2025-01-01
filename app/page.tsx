@@ -3,11 +3,7 @@
 import { useState } from "react"
 import InputsForm from "./_components/inputs-form"
 import OutputsSection from "./_components/outputs-section"
-
-// We'll import the prompt-builder and the system prompts
-import { buildPrompt } from "@/lib/prompt-builder"
-import { telegramPrompt } from "@/prompts/telegram-prompt"
-import { threadsPrompt } from "@/prompts/threads-prompt"
+import { generateAction } from "./_actions/generate-action"
 
 export default function HomePage() {
   const [referencePost, setReferencePost] = useState("")
@@ -17,28 +13,23 @@ export default function HomePage() {
   const [claudeOutput, setClaudeOutput] = useState("")
   const [geminiOutput, setGeminiOutput] = useState("")
 
-  // We'll also allow user to pick which "prompt template" they want (just for demonstration)
+  // Keep the existing dropdown for prompt template
   const [selectedPlatform, setSelectedPlatform] = useState<"threads" | "telegram">("threads")
 
-  // Placeholder for generating outputs
+  // Called after user fills the form and clicks "Generate"
   async function handleGenerate() {
-    // Step 1: Choose the appropriate system prompt
-    const systemPrompt = selectedPlatform === "threads" ? threadsPrompt : telegramPrompt
+    // Call server action with the user’s inputs
+    const result = await generateAction({
+      referencePost,
+      info,
+      selectedModels,
+      selectedPlatform
+    })
 
-    // Step 2: Build the final prompt with user input
-    const finalPrompt = buildPrompt(systemPrompt, referencePost, info)
-
-    // For demonstration, we simply show the final prompt in each output
-    // In a real scenario, you'd send finalPrompt to your LLM or Puppeteer client.
-    if (selectedModels.includes("chatgpt")) {
-      setChatGPTOutput(`[ChatGPT] Final Prompt:\n${finalPrompt}`)
-    }
-    if (selectedModels.includes("claude")) {
-      setClaudeOutput(`[Claude] Final Prompt:\n${finalPrompt}`)
-    }
-    if (selectedModels.includes("gemini")) {
-      setGeminiOutput(`[Gemini] Final Prompt:\n${finalPrompt}`)
-    }
+    // Update local states with the returned outputs
+    setChatGPTOutput(result.chatGPTOutput)
+    setClaudeOutput(result.claudeOutput)
+    setGeminiOutput(result.geminiOutput)
   }
 
   function handleOnGenerate(formData: {
@@ -50,18 +41,18 @@ export default function HomePage() {
     setInfo(formData.info)
     setSelectedModels(formData.selectedModels)
 
-    // Reset outputs
+    // Reset old outputs
     setChatGPTOutput("")
     setClaudeOutput("")
     setGeminiOutput("")
 
-    handleGenerate()
+    // Trigger the Puppeteer + LLM logic
+    void handleGenerate()
   }
 
   return (
     <div className="min-h-screen p-4 flex flex-col gap-8">
       <div className="max-w-2xl mx-auto w-full p-4 border rounded-md shadow-sm">
-
         <h1 className="text-xl font-bold mb-4">Automated Post Generation</h1>
 
         <div className="mb-4">
