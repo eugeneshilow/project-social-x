@@ -8,8 +8,13 @@ const CLAUDE_COOKIES_PATH = path.join(process.cwd(), "claude-cookies.json");
 
 /**
  * fetchFromClaude
- * Launches Puppeteer, navigates to Claude, inserts user prompt,
- * waits for new message, returns the last message's text.
+ * 1. Launch Puppeteer
+ * 2. Navigate & insert prompt
+ * 3. Wait for new message
+ * 4. Wait until streaming ends
+ * 5. Pause briefly, then look for the copy button
+ * 6. Click it, read the clipboard
+ * 7. Return the text
  */
 export async function fetchFromClaude(prompt: string): Promise<string> {
   console.log("[fetchFromClaude] Starting Puppeteer with prompt:\n", prompt);
@@ -23,6 +28,8 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-blink-features=AutomationControlled"
+        // If needed for clipboard:
+        // "--enable-features=ClipboardReadWrite"
       ]
     });
     console.log("[fetchFromClaude] Browser launched successfully.");
@@ -70,9 +77,11 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       el.innerText = txt;
     }, contentEditableSelector, prompt);
 
-    // 5) Count old messages: use "div.font-claude-message p"
-    const messageSelector = "div.font-claude-message p";
-    const oldCount = await page.$$eval(messageSelector, (msgs) => msgs.length);
+    // We'll track messages by their container: "div.font-claude-message"
+    const messageContainerSelector = "div.font-claude-message";
+
+    // 5) Count old messages
+    const oldCount = await page.$$eval(messageContainerSelector, (msgs) => msgs.length);
     console.log("[fetchFromClaude] oldCount =", oldCount);
 
     // Press Enter
@@ -80,39 +89,93 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     await page.focus(contentEditableSelector);
     await page.keyboard.press("Enter");
 
-    // 6) Poll for new messages (2 minutes total)
-    console.log("[fetchFromClaude] Polling for new messages up to 2 minutes...");
-
+    // 6) Wait for new message container
+    console.log("[fetchFromClaude] Waiting for new message container...");
+    const maxNewMsgTries = 30; // up to ~60s
     let newCount = oldCount;
-    const maxTries = 60; // each try is 2s => 120s total
-    for (let i = 0; i < maxTries; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2s
-      newCount = await page.$$eval(messageSelector, (msgs) => msgs.length);
-      console.log(`[fetchFromClaude] Try #${i + 1}: newCount=${newCount} oldCount=${oldCount}`);
-      if (newCount > oldCount) break;
-    }
 
-    // 7) If no new message, return empty
+    for (let i = 0; i < maxNewMsgTries; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      newCount = await page.$$eval(messageContainerSelector, (msgs) => msgs.length);
+      console.log(`[fetchFromClaude] Check #${i + 1}: newCount=${newCount} oldCount=${oldCount}`);
+      if (newCount > oldCount) {
+        console.log("[fetchFromClaude] Found a new message container, waiting for streaming to finish...");
+        break;
+      }
+    }
     if (newCount <= oldCount) {
       console.warn("[fetchFromClaude] Timed out or no new messages arrived from Claude.");
       return "";
     }
 
-    // 8) Get the last message's text
-    const lastResponse = await page.evaluate((sel) => {
-      const msgs = document.querySelectorAll(sel);
-      const lastMsg = msgs[msgs.length - 1] as HTMLElement | null;
-      return lastMsg?.innerText.trim() || "";
-    }, messageSelector);
+    // 7) Wait for data-is-streaming="true" to go away
+    const maxStreamTries = 30; // up to ~60s
+    for (let j = 0; j < maxStreamTries; j++) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const stillStreaming = await page.$$eval('div[data-is-streaming="true"]', (els) => els.length);
+      console.log(`[fetchFromClaude] Stream check #${j + 1}: stillStreamingCount=${stillStreaming}`);
+      if (stillStreaming === 0) {
+        console.log("[fetchFromClaude] data-is-streaming=false => message is complete!");
+        break;
+      }
+    }
 
-    console.log("[fetchFromClaude] lastResponse:\n", lastResponse);
+    // 8) Wait a second or two for the "Copy" button to appear
+    console.log("[fetchFromClaude] Pausing 2s so copy button can appear...");
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // 9) Save cookies
+    // 9) Attempt up to 5 times (1s each) to find/click the copy button in the last container
+    let finalAnswer = "";
+    const maxButtonTries = 5;
+    for (let k = 0; k < maxButtonTries; k++) {
+      // Re-grab last container
+      const containerHandles = await page.$$(messageContainerSelector);
+      const lastContainer = containerHandles[containerHandles.length - 1];
+      if (!lastContainer) {
+        console.warn("[fetchFromClaude] Could not find the last message container!");
+        break;
+      }
+
+      // We can try to find a button with text "Copy" or the same SVG icon
+      // We'll do a more direct approach: check all 'button' elements, see if they contain "Copy"
+      const buttonHandles = await lastContainer.$$("button");
+      let copyButton = null;
+      for (const b of buttonHandles) {
+        const innerText = await b.evaluate((el) => el.innerText.trim());
+        if (innerText.toLowerCase() === "copy") {
+          copyButton = b;
+          break;
+        }
+      }
+
+      if (copyButton) {
+        console.log("[fetchFromClaude] Found the Copy button, clicking it now...");
+        await copyButton.click();
+
+        // Now read from clipboard
+        console.log("[fetchFromClaude] Reading from navigator.clipboard...");
+        finalAnswer = await page.evaluate(async () => {
+          return await navigator.clipboard.readText();
+        });
+
+        console.log("[fetchFromClaude] finalAnswer from clipboard =>\n", finalAnswer);
+        break;
+      } else {
+        console.log(`[fetchFromClaude] Try #${k + 1}: No copy button found, waiting 1s...`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    // 10) Save cookies
+    console.log("[fetchFromClaude] Saving cookies...");
     const currentCookies = await page.cookies();
-    fs.writeFileSync(CLAUDE_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
+    fs.writeFileSync(
+      CLAUDE_COOKIES_PATH,
+      JSON.stringify(currentCookies, null, 2)
+    );
     console.log("[fetchFromClaude] Cookies saved to claude-cookies.json");
 
-    return lastResponse;
+    return finalAnswer || "";
   } catch (error) {
     console.error("[fetchFromClaude] Error:", error);
     throw error;
