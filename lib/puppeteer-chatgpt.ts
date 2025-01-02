@@ -8,8 +8,8 @@ import puppeteer from "puppeteer";
 const CHATGPT_COOKIES_PATH = path.join(process.cwd(), "chatgpt-cookies.json");
 
 /**
- * Puppeteer-based function to fetch ChatGPT's response
- * It attempts to log in via cookies, then pastes the prompt and scrapes the response
+ * Puppeteer-based function to fetch ChatGPT's response.
+ * Targets the contenteditable <div> to input text, based on the provided snippet.
  */
 export async function fetchFromChatGPT(prompt: string): Promise<string> {
   console.log("[fetchFromChatGPT] Starting Puppeteer for ChatGPT (non-headless)...");
@@ -18,16 +18,13 @@ export async function fetchFromChatGPT(prompt: string): Promise<string> {
   try {
     browser = await puppeteer.launch({
       headless: false,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-blink-features=AutomationControlled"
+      ]
     });
     console.log("[fetchFromChatGPT] Browser launched successfully.");
-
-    console.log("[fetchFromChatGPT] Overriding permissions for chat.openai.com...");
-    await browser.defaultBrowserContext().overridePermissions("https://chat.openai.com", [
-      "clipboard-read",
-      "clipboard-write",
-    ]);
-    console.log("[fetchFromChatGPT] Clipboard permissions granted.");
   } catch (error) {
     console.error("[fetchFromChatGPT] Error launching Puppeteer:", error);
     throw error;
@@ -35,8 +32,12 @@ export async function fetchFromChatGPT(prompt: string): Promise<string> {
 
   try {
     const page = await browser.newPage();
+    console.log("[fetchFromChatGPT] New page created.");
 
-    // Overwrite clipboard logic
+    // Optionally set a viewport for consistency
+    await page.setViewport({ width: 1280, height: 900 });
+
+    // Overwrite clipboard logic for debugging
     await page.evaluateOnNewDocument(() => {
       (window as any)._puppeteerClipboard = "";
 
@@ -60,78 +61,89 @@ export async function fetchFromChatGPT(prompt: string): Promise<string> {
         return result;
       };
     });
+    console.log("[fetchFromChatGPT] Clipboard overrides set up.");
 
-    // Load cookies
+    // Load cookies if present
     if (fs.existsSync(CHATGPT_COOKIES_PATH)) {
+      console.log("[fetchFromChatGPT] Found ChatGPT cookies, trying to set them.");
       const cookiesString = fs.readFileSync(CHATGPT_COOKIES_PATH, "utf-8");
       const parsedCookies = JSON.parse(cookiesString);
-      await page.setCookie(...parsedCookies);
-      console.log("[fetchFromChatGPT] Cookies set on page.");
+      if (Array.isArray(parsedCookies) && parsedCookies.length > 0) {
+        await page.setCookie(...parsedCookies);
+        console.log("[fetchFromChatGPT] Cookies set on page.");
+      } else {
+        console.warn("[fetchFromChatGPT] Cookie file exists but is empty or invalid.");
+      }
+    } else {
+      console.warn("[fetchFromChatGPT] No cookies file found. Might need manual login.");
     }
 
-    await page.goto("https://chat.openai.com/chat", { waitUntil: "networkidle0" });
-    console.log("[fetchFromChatGPT] Page loaded =>", await page.title());
+    // Navigate to the chat page (user domain or official)
+    const targetURL = "https://chatgpt.com/"; // Example user domain per logs
+    console.log("[fetchFromChatGPT] Navigating to:", targetURL);
+    await page.goto(targetURL, { waitUntil: "networkidle0" });
+    console.log(`[fetchFromChatGPT] Page loaded => "${await page.title()}"`);
+    console.log("[fetchFromChatGPT] Current URL =>", page.url());
 
-    // If not logged in, user may see a login screen
-    // We'll try to proceed anyway; might fail if not logged in
-    const textareaSelector = 'textarea[data-id="root"]';
-    await page.waitForSelector(textareaSelector, { timeout: 30000 });
+    // Check if we might be stuck on login
+    if (page.url().includes("/auth/login")) {
+      console.warn("[fetchFromChatGPT] Looks like we're on a login page. Automated login or valid cookies are needed.");
+    }
 
-    // Insert prompt
-    await page.evaluate(
-      (selector: string, txt: string) => {
-        const el = document.querySelector<HTMLTextAreaElement>(selector);
-        if (el) el.value = txt;
-      },
-      textareaSelector,
-      prompt
-    );
+    // Based on your snippet, there's a hidden <textarea> and a visible <div contenteditable="true" ... id="prompt-textarea">
+    // So let's target that contenteditable div
+    const contentEditableSelector = 'div#prompt-textarea.ProseMirror';
+    console.log("[fetchFromChatGPT] Waiting for selector =>", contentEditableSelector);
+    await page.waitForSelector(contentEditableSelector, { timeout: 45000 });
+    console.log("[fetchFromChatGPT] Found contenteditable div. Attempting to click and type prompt...");
+
+    // Click and type the prompt
+    await page.click(contentEditableSelector);
+    await page.keyboard.type(prompt, { delay: 50 });
+    console.log("[fetchFromChatGPT] Prompt typed in the contenteditable.");
 
     // Press Enter
-    await page.focus(textareaSelector);
     await page.keyboard.press("Enter");
+    console.log("[fetchFromChatGPT] Pressed Enter, waiting for response to generate...");
 
-    // Wait for an answer to appear
-    const messageSelector = "div.flex.flex-col.items-center.text-sm";
+    // Wait/poll for the response
+    const messageSelector = "div.group.w-full";
     let finalAnswer = "";
-
-    // We'll wait up to ~60 seconds (30 x 2s)
     for (let i = 0; i < 30; i++) {
       await delay(2000);
 
-      // Attempt to find the last message from assistant
-      const messages = await page.$$eval(messageSelector, (els) => {
-        return els.map((el) => el.textContent?.trim() || "");
-      });
+      // Attempt to find the last message from the assistant
+      const messages = await page.$$eval(messageSelector, (els) =>
+        els.map((el) => el.textContent?.trim() || "")
+      );
 
-      // The last text might be the assistant's answer
       if (messages.length > 0) {
         finalAnswer = messages[messages.length - 1];
       }
 
-      // Check if there's a "Stop Generating" button or streaming in progress
+      // Checking if there's a "Stop Generating" button => means it's still streaming
       const isGenerating = await page.$$eval("button", (btns) =>
         btns.some((b) => b.textContent?.includes("Stop generating"))
       );
-      if (!isGenerating) {
-        // Possibly done generating
+
+      console.log(`[fetchFromChatGPT] Poll #${i + 1} => isGenerating=${isGenerating}, lastMessage="${finalAnswer.slice(0, 60)}..."`);
+
+      if (!isGenerating && finalAnswer) {
+        console.log("[fetchFromChatGPT] No 'Stop Generating' button found, likely done generating. Breaking loop.");
         break;
       }
     }
 
-    // Fallback if no finalAnswer found
-    if (!finalAnswer) {
-      console.log("[fetchFromChatGPT] Fallback: no final answer in text, we'll do best to get last one");
+    // Save cookies after the conversation
+    try {
+      const currentCookies = await page.cookies();
+      fs.writeFileSync(CHATGPT_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
+      console.log("[fetchFromChatGPT] Updated cookies saved.");
+    } catch (err) {
+      console.error("[fetchFromChatGPT] Error saving cookies:", err);
     }
 
-    // Attempt to copy final answer by selecting the text area, etc. 
-    // (ChatGPT doesn't always have a direct copy button.)
-    // We'll skip advanced copy button logic for now.
-
-    // Save cookies
-    const currentCookies = await page.cookies();
-    fs.writeFileSync(CHATGPT_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
-
+    console.log("[fetchFromChatGPT] Final answer length =>", finalAnswer.length);
     return finalAnswer || "";
   } catch (error) {
     console.error("[fetchFromChatGPT] Error:", error);
