@@ -1,5 +1,6 @@
 "use server"
 
+import { fetchFromGemini } from "@/lib/gemini"
 import { buildPrompt } from "@/lib/prompt-builder"
 import { fetchFromChatGPT } from "@/lib/puppeteer-chatgpt"
 import { fetchFromClaude } from "@/lib/puppeteer-claude"
@@ -42,8 +43,6 @@ export async function generateAction({
     console.log("[generateAction] User selected ChatGPT, calling fetchFromChatGPT...")
     chatGPTOutput = await fetchFromChatGPT(finalPrompt)
     console.log("[generateAction] Puppeteer returned for ChatGPT:", chatGPTOutput)
-  } else {
-    console.log("[generateAction] ChatGPT NOT selected, skipping Puppeteer call.")
   }
 
   // Claude (via Puppeteer)
@@ -51,13 +50,18 @@ export async function generateAction({
     console.log("[generateAction] User selected Claude, calling fetchFromClaude...")
     claudeOutput = await fetchFromClaude(finalPrompt)
     console.log("[generateAction] Puppeteer returned for Claude:", claudeOutput)
-  } else {
-    console.log("[generateAction] Claude NOT selected, skipping Puppeteer call.")
   }
 
-  // Gemini (placeholder)
+  // Gemini (via API)
   if (selectedModels.includes("gemini")) {
-    geminiOutput = `[Gemini] Final Prompt:\n${finalPrompt}`
+    console.log("[generateAction] User selected Gemini, calling Gemini API...")
+    try {
+      geminiOutput = await fetchFromGemini(finalPrompt)
+      console.log("[generateAction] Gemini API returned:", geminiOutput)
+    } catch (error) {
+      console.error("[generateAction] Error with Gemini API:", error)
+      geminiOutput = "Error: Failed to get response from Gemini"
+    }
   }
 
   return {
