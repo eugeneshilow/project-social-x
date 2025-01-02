@@ -12,9 +12,7 @@ const CHATGPT_COOKIES_PATH = path.join(process.cwd(), "chatgpt-cookies.json");
  * we now directly parse the last assistant message from the DOM,
  * returning both:
  * 1) rawHTML: with tags (strong, em, etc.)
- * 2) plainText: stripped version suitable for Markdown.
- * 
- * We skip user messages and extra "kasha," focusing on the final assistant message only.
+ * 2) plainText: with preserved blank lines for nicer Markdown spacing.
  */
 export async function fetchFromChatGPT(prompt: string): Promise<string> {
   console.log("[fetchFromChatGPT] Starting Puppeteer (non-headless)...");
@@ -42,24 +40,31 @@ export async function fetchFromChatGPT(prompt: string): Promise<string> {
     await page.goto("https://chatgpt.com/", { waitUntil: "networkidle0" });
     console.log("[fetchFromChatGPT] Page =>", await page.title());
 
-    // 1) Insert prompt
+    // 1) Insert prompt if the text area is found
     const contentSel = 'div#prompt-textarea.ProseMirror';
-    await page.waitForSelector(contentSel, { timeout: 60000 });
-    console.log("[fetchFromChatGPT] Found text area => setting prompt...");
-    await page.evaluate((sel, userPrompt) => {
-      const el = document.querySelector<HTMLElement>(sel);
-      if (el) el.innerText = userPrompt;
-    }, contentSel, prompt);
+    await page.waitForSelector(contentSel, { timeout: 60000 }).catch(() => {
+      console.warn("[fetchFromChatGPT] Could not find the text area selector!");
+    });
 
-    console.log("[fetchFromChatGPT] Pressing Enter...");
-    await page.focus(contentSel);
-    await page.keyboard.press("Enter");
+    const elExists = await page.$(contentSel);
+    if (elExists) {
+      console.log("[fetchFromChatGPT] Found text area => setting prompt...");
+      await page.evaluate((sel, userPrompt) => {
+        const el = document.querySelector<HTMLElement>(sel);
+        if (el) el.innerText = userPrompt;
+      }, contentSel, prompt);
 
-    // 2) Wait until "Stop generating" disappears or 30s pass
+      console.log("[fetchFromChatGPT] Pressing Enter...");
+      await page.focus(contentSel);
+      await page.keyboard.press("Enter");
+    } else {
+      console.log("[fetchFromChatGPT] No recognized text area found; continuing anyway...");
+    }
+
+    // 2) Wait up to 30s for generation to finish
     await waitForCompletion(page);
 
-    // 3) Parse the last assistant message, returning
-    //    <rawHTML> plus <strippedText> as JSON, for example
+    // 3) Get the last assistant message
     const { rawHTML, strippedText } = await getLastAssistantMessage(page);
     console.log(
       `[fetchFromChatGPT] Extracted => rawHTML len=${rawHTML.length}, strippedText len=${strippedText.length}`
@@ -67,8 +72,7 @@ export async function fetchFromChatGPT(prompt: string): Promise<string> {
 
     await saveCookies(page, CHATGPT_COOKIES_PATH, "[fetchFromChatGPT]");
 
-    // We'll return them combined or just store them in JSON
-    // For now, let's embed them in a single string with a JSON structure
+    // Combine them in JSON
     const finalData = JSON.stringify({
       rawHTML,
       strippedText,
@@ -88,7 +92,6 @@ export async function fetchFromChatGPT(prompt: string): Promise<string> {
 
 /**
  * Wait up to 30s for "Stop generating" to vanish, meaning the AI is done responding.
- * Uses our custom delay() instead of page.waitForTimeout().
  */
 async function waitForCompletion(page: Page) {
   const start = Date.now();
@@ -125,49 +128,45 @@ async function waitForCompletion(page: Page) {
 
 /**
  * Get the last assistant message in ChatGPT's DOM, ignoring user messages.
- * Return both raw HTML (with tags) and plain text (for markdown).
+ * Return raw HTML plus text with blank lines for paragraphs.
  */
 async function getLastAssistantMessage(page: Page) {
-  const allContainers = await page.$$("div.group.w-full");
-  console.log("[getLastAssistantMessage] => total containers =>", allContainers.length);
+  const allAssistantNodes = await page.$$(
+    'div[data-message-author-role="assistant"]'
+  );
+  console.log(
+    "[getLastAssistantMessage] => total assistant nodes =>",
+    allAssistantNodes.length
+  );
 
-  // We'll filter out any container that has an input or might be recognized as user side
-  const assistantHandles: Array<{
-    handleIndex: number;
-    handle: puppeteer.ElementHandle<Element>;
-  }> = [];
-
-  for (let i = 0; i < allContainers.length; i++) {
-    const handle = allContainers[i];
-    const isUser = await handle.evaluate((node) => {
-      return !!node.querySelector("textarea, .ProseMirror, input");
-    });
-    if (!isUser) {
-      assistantHandles.push({ handleIndex: i, handle });
-    }
-  }
-
-  if (!assistantHandles.length) {
+  if (!allAssistantNodes.length) {
     console.log("[getLastAssistantMessage] => no assistant containers found => returning empty");
     return { rawHTML: "", strippedText: "" };
   }
 
-  const lastAssistant = assistantHandles[assistantHandles.length - 1].handle;
+  const lastAssistant = allAssistantNodes[allAssistantNodes.length - 1];
 
-  // Remove any leftover button, etc. from the DOM so they don’t appear in raw HTML
+  // Remove leftover buttons or icons
   await lastAssistant.evaluate((node) => {
-    node.querySelectorAll("button, svg, .copy-button, [role='button']").forEach((el) => el.remove());
+    node
+      .querySelectorAll("button, svg, .copy-button, [role='button']")
+      .forEach((el) => el.remove());
   });
 
   // Extract raw HTML
   const rawHTML = await lastAssistant.evaluate((node) => node.innerHTML.trim());
 
-  // Extract stripped text
-  const strippedText = await lastAssistant.evaluate(
-    (node) => node.textContent?.replace(/\s+/g, " ").trim() || ""
+  // Extract innerText while preserving paragraph spacing
+  let textContent = await lastAssistant.evaluate(
+    (node) => node.innerText || ""
   );
+  // Convert multiple blank lines to a single blank line
+  textContent = textContent
+    .replace(/\r\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
-  return { rawHTML, strippedText };
+  return { rawHTML, strippedText: textContent };
 }
 
 //------------------------------------------------------------------
