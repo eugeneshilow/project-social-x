@@ -3,7 +3,8 @@
 import { buildPrompt } from "@/lib/prompt-builder"
 import { telegramPrompt } from "@/prompts/telegram-prompt"
 import { threadsPrompt } from "@/prompts/threads-prompt"
-import { fetchFromClaude } from "@/lib/puppeteer-client"
+import { fetchFromClaude } from "@/lib/puppeteer-claude"
+import { fetchFromChatGPT } from "@/lib/puppeteer-chatgpt"
 
 interface GenerateParams {
   referencePost: string
@@ -36,13 +37,16 @@ export async function generateAction({
   let claudeOutput = ""
   let geminiOutput = ""
 
-  // ChatGPT (placeholder)
+  // ChatGPT (via Puppeteer)
   if (selectedModels.includes("chatgpt")) {
-    chatGPTOutput = `[ChatGPT] Final Prompt:\n${finalPrompt}`
+    console.log("[generateAction] User selected ChatGPT, calling fetchFromChatGPT...")
+    chatGPTOutput = await fetchFromChatGPT(finalPrompt)
+    console.log("[generateAction] Puppeteer returned for ChatGPT:", chatGPTOutput)
+  } else {
+    console.log("[generateAction] ChatGPT NOT selected, skipping Puppeteer call.")
   }
 
   // Claude (via Puppeteer)
-  // Ensure user selected "claude"
   if (selectedModels.includes("claude")) {
     console.log("[generateAction] User selected Claude, calling fetchFromClaude...")
     claudeOutput = await fetchFromClaude(finalPrompt)

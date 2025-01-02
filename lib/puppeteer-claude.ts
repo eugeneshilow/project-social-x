@@ -13,20 +13,15 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
 
   try {
     browser = await puppeteer.launch({
-      headless: false, // хотим видеть окно, чтобы при необходимости вручную нажать "Allow"
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-blink-features=AutomationControlled"
-      ]
+      headless: false, // see browser window
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"],
     });
     console.log("[fetchFromClaude] Browser launched successfully.");
 
-    // Настраиваем разрешения
     console.log("[fetchFromClaude] Overriding permissions for claude.ai...");
     await browser.defaultBrowserContext().overridePermissions("https://claude.ai", [
       "clipboard-read",
-      "clipboard-write"
+      "clipboard-write",
     ]);
     console.log("[fetchFromClaude] Clipboard permissions granted.");
   } catch (error) {
@@ -37,28 +32,22 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
   try {
     const page = await browser.newPage();
 
-    // 1) Переопределяем Clipboard API ДО загрузки сайта
+    // 1) Overwrite Clipboard API before site loads
     await page.evaluateOnNewDocument(() => {
-      // Создадим глобальную переменную, куда будем всё складывать
       (window as any)._puppeteerClipboard = "";
 
-      // Переопределяем navigator.clipboard.writeText
       if (navigator.clipboard && navigator.clipboard.writeText) {
         const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
         (navigator.clipboard as any).writeText = async (data: string) => {
           (window as any)._puppeteerClipboard = data;
-          // Чтобы ничего не сломать, вызываем оригинал
           return originalWriteText(data);
         };
       }
 
-      // Переопределяем document.execCommand('copy')
-      // (на случай, если сайт его использует)
       const originalExecCommand = document.execCommand;
       document.execCommand = function (commandId, showUI, value) {
         const result = originalExecCommand.apply(this, [commandId, showUI, value]);
         if (commandId === "copy") {
-          // Пытаемся прочитать выделенный текст
           const selection = window.getSelection && window.getSelection();
           if (selection && selection.toString()) {
             (window as any)._puppeteerClipboard = selection.toString();
@@ -68,7 +57,7 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       };
     });
 
-    // 2) Загрузка cookies
+    // 2) Load cookies
     if (fs.existsSync(CLAUDE_COOKIES_PATH)) {
       const cookiesString = fs.readFileSync(CLAUDE_COOKIES_PATH, "utf-8");
       const parsedCookies = JSON.parse(cookiesString);
@@ -76,17 +65,17 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       console.log("[fetchFromClaude] Cookies set on page.");
     }
 
-    // 3) Идём на claude.ai/new
+    // 3) Navigate to Claude
     await page.goto("https://claude.ai/new", { waitUntil: "networkidle0" });
     console.log("[fetchFromClaude] Page loaded =>", await page.title());
 
-    // 4) Проверяем логин
+    // 4) Check if logged in
     const loginButton = await page.$("button#login-button");
     if (loginButton) {
       console.warn("[fetchFromClaude] Possibly not logged in. Might fail if we need an authenticated user!");
     }
 
-    // 5) Вставляем prompt
+    // 5) Insert prompt
     const contentEditableSelector = 'div[contenteditable="true"]';
     await page.waitForSelector(contentEditableSelector, { timeout: 20000 });
     await page.evaluate(
@@ -98,39 +87,37 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       prompt
     );
 
-    // 6) Считаем старые сообщения
+    // 6) Count older messages
     const messageContainerSelector = "div.font-claude-message";
     const oldCount = await page.$$eval(messageContainerSelector, (msgs) => msgs.length);
 
-    // Нажимаем Enter
+    // Press Enter
     await page.focus(contentEditableSelector);
     await page.keyboard.press("Enter");
 
-    // 7) Ждём новое сообщение
+    // 7) Wait for new message
     let newCount = oldCount;
     for (let i = 0; i < 30; i++) {
       await delay(2000);
       newCount = await page.$$eval(messageContainerSelector, (msgs) => msgs.length);
-      if (newCount > oldCount) {
-        break;
-      }
+      if (newCount > oldCount) break;
     }
     if (newCount <= oldCount) {
       console.warn("[fetchFromClaude] Timed out waiting for new message!");
       return "";
     }
 
-    // 8) Ждём конца стриминга
+    // 8) Wait until streaming ends
     for (let j = 0; j < 30; j++) {
       await delay(2000);
       const stillStreaming = await page.$$eval('div[data-is-streaming="true"]', (els) => els.length);
       if (stillStreaming === 0) break;
     }
 
-    // 9) Ждём пару секунд, чтобы кнопка Copy точно появилась
+    // 9) Wait a bit so Copy button definitely appears
     await delay(3000);
 
-    // 10) Ищем последний контейнер
+    // 10) Last container
     const containerHandles = await page.$$(messageContainerSelector);
     const lastContainer = containerHandles[containerHandles.length - 1];
     if (!lastContainer) {
@@ -141,21 +128,15 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     let finalAnswer = "";
     const maxButtonTries = 5;
 
-    // 11) Несколько попыток нажать Copy и проверить _puppeteerClipboard
+    // 11) Attempt to click Copy button multiple times
     for (let k = 0; k < maxButtonTries; k++) {
       console.log(`[fetchFromClaude] Copy button detection attempt #${k + 1}`);
       await delay(2000);
 
-      // Нажимаем на кнопку Copy (XPath или fallback)
       const clicked = await lastContainer.evaluate((container) => {
-        const COPY_BUTTON_XPATH = '/html/body/div[3]/div/div/div[2]/div[1]/div[1]/div[2]/div/div/div[2]/div/div/div[1]/button[1]';
-        const result = document.evaluate(
-          COPY_BUTTON_XPATH,
-          document,
-          null,
-          XPathResult.FIRST_ORDERED_NODE_TYPE,
-          null
-        );
+        const COPY_BUTTON_XPATH =
+          '/html/body/div[3]/div/div/div[2]/div[1]/div[1]/div[2]/div/div/div[2]/div/div/div[1]/button[1]';
+        const result = document.evaluate(COPY_BUTTON_XPATH, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
         const copyButton = result.singleNodeValue as HTMLButtonElement | null;
         if (copyButton) {
           copyButton.click();
@@ -176,13 +157,8 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       });
 
       if (clicked) {
-        // Ждём, пока сайт что-то скопирует
         await delay(1500);
-
-        // Берём из _puppeteerClipboard
-        const data = await page.evaluate(() => {
-          return (window as any)._puppeteerClipboard;
-        });
+        const data = await page.evaluate(() => (window as any)._puppeteerClipboard);
         if (data && typeof data === "string" && data.trim().length > 0) {
           finalAnswer = data;
           console.log(`[fetchFromClaude] Copied text length=${data.length}`);
@@ -195,13 +171,13 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
       }
     }
 
-    // 12) Если всё ещё пусто - делаем fallback (парсим DOM)
+    // 12) Fallback to direct DOM extraction
     if (!finalAnswer) {
-      console.warn("[fetchFromClaude] No data from copy after attempts, fallback to direct DOM extraction");
+      console.warn("[fetchFromClaude] No data from copy, fallback to DOM extraction");
       finalAnswer = await lastMessageTextFallback(page, messageContainerSelector);
     }
 
-    // 13) Сохраняем cookies
+    // 13) Save cookies
     const currentCookies = await page.cookies();
     fs.writeFileSync(CLAUDE_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
 
