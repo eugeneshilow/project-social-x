@@ -8,8 +8,8 @@ import puppeteer from "puppeteer";
 const CHATGPT_COOKIES_PATH = path.join(process.cwd(), "chatgpt-cookies.json");
 
 /**
- * Puppeteer-based function to fetch ChatGPT's response.
- * Targets the contenteditable <div> to input text, based on the provided snippet.
+ * Puppeteer-based function to fetch ChatGPT's response,
+ * mirroring the approach used in puppeteer-claude.ts by setting the innerText of the contenteditable field directly.
  */
 export async function fetchFromChatGPT(prompt: string): Promise<string> {
   console.log("[fetchFromChatGPT] Starting Puppeteer for ChatGPT (non-headless)...");
@@ -37,32 +37,6 @@ export async function fetchFromChatGPT(prompt: string): Promise<string> {
     // Optionally set a viewport for consistency
     await page.setViewport({ width: 1280, height: 900 });
 
-    // Overwrite clipboard logic for debugging
-    await page.evaluateOnNewDocument(() => {
-      (window as any)._puppeteerClipboard = "";
-
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
-        (navigator.clipboard as any).writeText = async (data: string) => {
-          (window as any)._puppeteerClipboard = data;
-          return originalWriteText(data);
-        };
-      }
-
-      const originalExecCommand = document.execCommand;
-      document.execCommand = function (commandId, showUI, value) {
-        const result = originalExecCommand.apply(this, [commandId, showUI, value]);
-        if (commandId === "copy") {
-          const selection = window.getSelection && window.getSelection();
-          if (selection && selection.toString()) {
-            (window as any)._puppeteerClipboard = selection.toString();
-          }
-        }
-        return result;
-      };
-    });
-    console.log("[fetchFromChatGPT] Clipboard overrides set up.");
-
     // Load cookies if present
     if (fs.existsSync(CHATGPT_COOKIES_PATH)) {
       console.log("[fetchFromChatGPT] Found ChatGPT cookies, trying to set them.");
@@ -79,7 +53,7 @@ export async function fetchFromChatGPT(prompt: string): Promise<string> {
     }
 
     // Navigate to the chat page (user domain or official)
-    const targetURL = "https://chatgpt.com/"; // Example user domain per logs
+    const targetURL = "https://chatgpt.com/";
     console.log("[fetchFromChatGPT] Navigating to:", targetURL);
     await page.goto(targetURL, { waitUntil: "networkidle0" });
     console.log(`[fetchFromChatGPT] Page loaded => "${await page.title()}"`);
@@ -87,54 +61,72 @@ export async function fetchFromChatGPT(prompt: string): Promise<string> {
 
     // Check if we might be stuck on login
     if (page.url().includes("/auth/login")) {
-      console.warn("[fetchFromChatGPT] Looks like we're on a login page. Automated login or valid cookies are needed.");
+      console.warn("[fetchFromChatGPT] Possibly stuck on login page. Valid cookies or automated login needed.");
     }
 
-    // Based on your snippet, there's a hidden <textarea> and a visible <div contenteditable="true" ... id="prompt-textarea">
-    // So let's target that contenteditable div
+    // Based on snippet, there's a visible <div contenteditable="true" id="prompt-textarea"> in the final DOM
     const contentEditableSelector = 'div#prompt-textarea.ProseMirror';
     console.log("[fetchFromChatGPT] Waiting for selector =>", contentEditableSelector);
     await page.waitForSelector(contentEditableSelector, { timeout: 45000 });
-    console.log("[fetchFromChatGPT] Found contenteditable div. Attempting to click and type prompt...");
+    console.log("[fetchFromChatGPT] Found contenteditable div for prompt.");
 
-    // Click and type the prompt
-    await page.click(contentEditableSelector);
-    await page.keyboard.type(prompt, { delay: 50 });
-    console.log("[fetchFromChatGPT] Prompt typed in the contenteditable.");
+    // Insert the prompt by directly setting innerText, then press Enter
+    await page.evaluate((selector: string, txt: string) => {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (el) el.innerText = txt;
+    }, contentEditableSelector, prompt);
 
-    // Press Enter
+    console.log("[fetchFromChatGPT] Prompt inserted. Pressing Enter...");
+    await page.focus(contentEditableSelector);
     await page.keyboard.press("Enter");
-    console.log("[fetchFromChatGPT] Pressed Enter, waiting for response to generate...");
 
     // Wait/poll for the response
     const messageSelector = "div.group.w-full";
     let finalAnswer = "";
-    for (let i = 0; i < 30; i++) {
+
+    // We'll detect if the text stabilizes for consecutive polls
+    let stableCount = 0;
+    let lastMessage = "";
+    const requiredStableRounds = 3;
+
+    for (let i = 0; i < 60; i++) {
       await delay(2000);
 
-      // Attempt to find the last message from the assistant
       const messages = await page.$$eval(messageSelector, (els) =>
         els.map((el) => el.textContent?.trim() || "")
       );
 
       if (messages.length > 0) {
         finalAnswer = messages[messages.length - 1];
+      } else {
+        finalAnswer = "";
       }
 
-      // Checking if there's a "Stop Generating" button => means it's still streaming
+      // Check if there's a "Stop generating" button => means it's still streaming
       const isGenerating = await page.$$eval("button", (btns) =>
         btns.some((b) => b.textContent?.includes("Stop generating"))
       );
 
-      console.log(`[fetchFromChatGPT] Poll #${i + 1} => isGenerating=${isGenerating}, lastMessage="${finalAnswer.slice(0, 60)}..."`);
+      if (finalAnswer === lastMessage) {
+        stableCount++;
+      } else {
+        stableCount = 0;
+        lastMessage = finalAnswer;
+      }
 
-      if (!isGenerating && finalAnswer) {
-        console.log("[fetchFromChatGPT] No 'Stop Generating' button found, likely done generating. Breaking loop.");
+      console.log(
+        `[fetchFromChatGPT] Poll #${i + 1} => isGenerating=${isGenerating}, stableCount=${stableCount}, ` +
+        `lastMessage="${finalAnswer.slice(0, 60)}..."`
+      );
+
+      // If no "Stop generating" button is visible and text hasn't changed for ~3 polls, we consider it done
+      if (!isGenerating && stableCount >= requiredStableRounds && finalAnswer) {
+        console.log("[fetchFromChatGPT] Text stabilized. Breaking loop.");
         break;
       }
     }
 
-    // Save cookies after the conversation
+    // Save cookies
     try {
       const currentCookies = await page.cookies();
       fs.writeFileSync(CHATGPT_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
