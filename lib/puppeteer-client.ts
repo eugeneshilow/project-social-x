@@ -144,79 +144,70 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
         console.log(`[fetchFromClaude] Copy button detection attempt #${k + 1}`);
         
         try {
-          // Wait for the button to be fully loaded
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Wait longer for the full response to be rendered
+          await new Promise(resolve => setTimeout(resolve, 3000));
 
-          // Try to find and click the copy button using XPath
+          // First try: Direct text extraction before attempting clipboard
+          const messageText = await lastContainer.evaluate((container) => {
+            const messageContent = container.querySelector('[data-message-content="true"]');
+            if (messageContent) {
+              return messageContent.textContent || '';
+            }
+            return container.textContent || '';
+          });
+
+          if (messageText && messageText.length > 10) {
+            console.log("[fetchFromClaude] Successfully extracted text directly");
+            finalAnswer = messageText;
+            break;
+          }
+
+          // Second try: Clipboard method as fallback
           const clicked = await lastContainer.evaluate((container) => {
-            // The exact XPath for the copy button
-            const COPY_BUTTON_XPATH = '/html/body/div[3]/div/div/div[2]/div[1]/div[1]/div[2]/div/div/div[2]/div/div/div[1]/button[1]';
-            
-            // Try XPath first
-            const result = document.evaluate(
-              COPY_BUTTON_XPATH,
-              document,
-              null,
-              XPathResult.FIRST_ORDERED_NODE_TYPE,
-              null
-            );
-            
-            const copyButton = result.singleNodeValue as HTMLButtonElement;
-            if (copyButton) {
-              copyButton.click();
-              return true;
-            }
-
-            // Fallback: try to find by SVG content
-            const buttons = Array.from(container.querySelectorAll('button'));
-            const fallbackButton = buttons.find(btn => {
-              const svg = btn.querySelector('svg[viewBox="0 0 256 256"]');
-              const path = btn.querySelector('path[d^="M200,32H163.74"]');
-              return svg && path && btn.textContent?.includes('Copy');
+            const copyButtons = Array.from(container.querySelectorAll('button')).filter(btn => {
+              return btn.textContent?.includes('Copy') || 
+                     btn.getAttribute('aria-label')?.includes('Copy');
             });
-
-            if (fallbackButton) {
-              fallbackButton.click();
+            
+            if (copyButtons.length > 0) {
+              copyButtons[0].click();
               return true;
             }
-
             return false;
           });
 
           if (clicked) {
-            // Wait for clipboard
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Wait longer for clipboard operations
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // Try to get clipboard content
-            finalAnswer = await page.evaluate(async () => {
+            const clipboardText = await page.evaluate(async () => {
               try {
                 return await navigator.clipboard.readText();
               } catch (e) {
+                console.error('Clipboard error:', e);
                 return '';
               }
             });
 
-            if (finalAnswer && finalAnswer.length > 10) {
+            if (clipboardText && clipboardText.length > 10) {
               console.log("[fetchFromClaude] Successfully got text from clipboard");
+              finalAnswer = clipboardText;
               break;
             }
-          } else {
-            console.log("[fetchFromClaude] Copy button not found, retrying...");
           }
 
-          // Wait before next attempt
+          // If both methods fail, try the fallback extraction
+          if (!finalAnswer) {
+            finalAnswer = await lastMessageTextFallback(page, messageContainerSelector);
+            if (finalAnswer) break;
+          }
+
           await new Promise(resolve => setTimeout(resolve, 1000));
 
         } catch (e) {
-          console.error("[fetchFromClaude] Error in copy attempt:", e);
+          console.error("[fetchFromClaude] Error in text extraction attempt:", e);
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
-      }
-
-      // If clipboard methods failed, fall back to direct text extraction
-      if (!finalAnswer) {
-        console.log("[fetchFromClaude] All clipboard attempts failed, falling back to text extraction...");
-        finalAnswer = await lastMessageTextFallback(page, messageContainerSelector);
       }
     }
 
@@ -256,35 +247,29 @@ async function lastMessageTextFallback(
     }
 
     return await lastContainer.evaluate((container) => {
-      const cleanText = (text: string) => {
-        return text
-          .replace(/\s+/g, ' ')
-          .replace(/\n+/g, '\n')
-          .trim();
-      };
-
+      // Try multiple selectors to find the message content
       const selectors = [
-        '[data-message-author-role="assistant"]',
         '[data-message-content="true"]',
         '.prose',
         '.whitespace-pre-wrap',
+        '[data-message-author-role="assistant"]'
       ];
 
       for (const selector of selectors) {
         const element = container.querySelector(selector);
         if (element) {
           const clone = element.cloneNode(true) as Element;
-          clone.querySelectorAll('button, svg, .copy-button, [role="button"], [data-message-author-role="user"]').forEach(el => el.remove());
-          const text = cleanText(clone.textContent || '');
-          if (text && !text.includes('svg') && !text.includes('xmlns') && text.length > 10) {
+          // Remove any UI elements that might contain unwanted text
+          clone.querySelectorAll('button, svg, .copy-button, [role="button"]').forEach(el => el.remove());
+          const text = clone.textContent?.trim() || '';
+          if (text && text.length > 10) {
             return text;
           }
         }
       }
 
-      const clone = container.cloneNode(true) as Element;
-      clone.querySelectorAll('button, svg, .copy-button, [role="button"], [data-message-author-role="user"]').forEach(el => el.remove());
-      return cleanText(clone.textContent || '');
+      // Last resort: get all text from the container
+      return container.textContent?.trim() || '';
     });
   } catch (error) {
     console.error("[lastMessageTextFallback] Error:", error);
