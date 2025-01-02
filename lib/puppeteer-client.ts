@@ -2,29 +2,18 @@
 
 import fs from "fs";
 import path from "path";
-import type { Browser, Page } from "puppeteer";
+import type { Browser } from "puppeteer";
 import puppeteer from "puppeteer";
 
 const CLAUDE_COOKIES_PATH = path.join(process.cwd(), "claude-cookies.json");
 
-/**
- * fetchFromClaude
- * 1. Launch Puppeteer
- * 2. Navigate & insert prompt
- * 3. Wait for new message
- * 4. Wait until streaming ends
- * 5. Pause briefly, then look for the copy button
- * 6. Click it, read the clipboard
- * 7. Return the text (paste into output)
- */
 export async function fetchFromClaude(prompt: string): Promise<string> {
-  console.log("[fetchFromClaude] Starting Puppeteer with prompt:\n", prompt);
-
+  console.log("[fetchFromClaude] Starting Puppeteer (non-headless)...");
   let browser: Browser | undefined;
+
   try {
-    console.log("[fetchFromClaude] Launching Puppeteer (non-headless)...");
     browser = await puppeteer.launch({
-      headless: false,
+      headless: false, // хотим видеть окно, чтобы при необходимости вручную нажать "Allow"
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -33,14 +22,13 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
     });
     console.log("[fetchFromClaude] Browser launched successfully.");
 
-    // NEW LINE: Override clipboard permissions for claude.ai
+    // Настраиваем разрешения
     console.log("[fetchFromClaude] Overriding permissions for claude.ai...");
     await browser.defaultBrowserContext().overridePermissions("https://claude.ai", [
       "clipboard-read",
       "clipboard-write"
     ]);
     console.log("[fetchFromClaude] Clipboard permissions granted.");
-
   } catch (error) {
     console.error("[fetchFromClaude] Error launching Puppeteer:", error);
     throw error;
@@ -48,176 +36,176 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
 
   try {
     const page = await browser.newPage();
-    console.log("[fetchFromClaude] New page created.");
 
-    // 1) Load cookies if present
+    // 1) Переопределяем Clipboard API ДО загрузки сайта
+    await page.evaluateOnNewDocument(() => {
+      // Создадим глобальную переменную, куда будем всё складывать
+      (window as any)._puppeteerClipboard = "";
+
+      // Переопределяем navigator.clipboard.writeText
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        const originalWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
+        (navigator.clipboard as any).writeText = async (data: string) => {
+          (window as any)._puppeteerClipboard = data;
+          // Чтобы ничего не сломать, вызываем оригинал
+          return originalWriteText(data);
+        };
+      }
+
+      // Переопределяем document.execCommand('copy')
+      // (на случай, если сайт его использует)
+      const originalExecCommand = document.execCommand;
+      document.execCommand = function (commandId, showUI, value) {
+        const result = originalExecCommand.apply(this, [commandId, showUI, value]);
+        if (commandId === "copy") {
+          // Пытаемся прочитать выделенный текст
+          const selection = window.getSelection && window.getSelection();
+          if (selection && selection.toString()) {
+            (window as any)._puppeteerClipboard = selection.toString();
+          }
+        }
+        return result;
+      };
+    });
+
+    // 2) Загрузка cookies
     if (fs.existsSync(CLAUDE_COOKIES_PATH)) {
-      console.log("[fetchFromClaude] Loading cookies from:", CLAUDE_COOKIES_PATH);
       const cookiesString = fs.readFileSync(CLAUDE_COOKIES_PATH, "utf-8");
       const parsedCookies = JSON.parse(cookiesString);
       await page.setCookie(...parsedCookies);
       console.log("[fetchFromClaude] Cookies set on page.");
-    } else {
-      console.warn("[fetchFromClaude] No claude-cookies.json found.");
     }
 
-    // 2) Go to Claude
-    console.log("[fetchFromClaude] Navigating to claude.ai/new...");
+    // 3) Идём на claude.ai/new
     await page.goto("https://claude.ai/new", { waitUntil: "networkidle0" });
     console.log("[fetchFromClaude] Page loaded =>", await page.title());
 
-    // 3) Check if logged in
+    // 4) Проверяем логин
     const loginButton = await page.$("button#login-button");
     if (loginButton) {
-      console.error("[fetchFromClaude] Possibly not logged in (login button detected).");
+      console.warn("[fetchFromClaude] Possibly not logged in. Might fail if we need an authenticated user!");
     }
 
-    // 4) Insert prompt
+    // 5) Вставляем prompt
     const contentEditableSelector = 'div[contenteditable="true"]';
-    console.log("[fetchFromClaude] Waiting for contenteditable...");
-    await page.waitForSelector(contentEditableSelector, { timeout: 15000 });
+    await page.waitForSelector(contentEditableSelector, { timeout: 20000 });
+    await page.evaluate(
+      (selector: string, txt: string) => {
+        const el = document.querySelector<HTMLElement>(selector);
+        if (el) el.innerText = txt;
+      },
+      contentEditableSelector,
+      prompt
+    );
 
-    console.log("[fetchFromClaude] Typing prompt...");
-    await page.evaluate((selector: string, txt: string) => {
-      const el = document.querySelector<HTMLElement>(selector);
-      if (!el) throw new Error("[fetchFromClaude] contenteditable not found!");
-      el.innerText = txt;
-    }, contentEditableSelector, prompt);
-
-    // We'll track messages by their container: "div.font-claude-message"
+    // 6) Считаем старые сообщения
     const messageContainerSelector = "div.font-claude-message";
+    const oldCount = await page.$$eval(messageContainerSelector, (msgs) => msgs.length);
 
-    // 5) Count old messages
-    const oldCount = await page.$$eval(messageContainerSelector, (msgs: Element[]) => msgs.length);
-    console.log("[fetchFromClaude] oldCount =", oldCount);
-
-    // Press Enter
-    console.log("[fetchFromClaude] Pressing Enter to submit prompt...");
+    // Нажимаем Enter
     await page.focus(contentEditableSelector);
     await page.keyboard.press("Enter");
 
-    // 6) Wait for new message container
-    console.log("[fetchFromClaude] Waiting for new message container...");
-    const maxNewMsgTries = 30; // up to ~60s
+    // 7) Ждём новое сообщение
     let newCount = oldCount;
-
-    for (let i = 0; i < maxNewMsgTries; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      newCount = await page.$$eval(messageContainerSelector, (msgs: Element[]) => msgs.length);
-      console.log(`[fetchFromClaude] Check #${i + 1}: newCount=${newCount} oldCount=${oldCount}`);
+    for (let i = 0; i < 30; i++) {
+      await delay(2000);
+      newCount = await page.$$eval(messageContainerSelector, (msgs) => msgs.length);
       if (newCount > oldCount) {
-        console.log("[fetchFromClaude] Found a new message container, waiting for streaming to finish...");
         break;
       }
     }
     if (newCount <= oldCount) {
-      console.warn("[fetchFromClaude] Timed out or no new messages arrived from Claude.");
+      console.warn("[fetchFromClaude] Timed out waiting for new message!");
       return "";
     }
 
-    // 7) Wait for data-is-streaming="true" to go away
-    const maxStreamTries = 30; // up to ~60s
-    for (let j = 0; j < maxStreamTries; j++) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      const stillStreaming = await page.$$eval('div[data-is-streaming="true"]', (els: Element[]) => els.length);
-      console.log(`[fetchFromClaude] Stream check #${j + 1}: stillStreamingCount=${stillStreaming}`);
-      if (stillStreaming === 0) {
-        console.log("[fetchFromClaude] data-is-streaming=false => message is complete!");
-        break;
-      }
+    // 8) Ждём конца стриминга
+    for (let j = 0; j < 30; j++) {
+      await delay(2000);
+      const stillStreaming = await page.$$eval('div[data-is-streaming="true"]', (els) => els.length);
+      if (stillStreaming === 0) break;
     }
 
-    // 8) Wait a second or two for the "Copy" button to appear
-    console.log("[fetchFromClaude] Pausing 2s so copy button can appear...");
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    // 9) Ждём пару секунд, чтобы кнопка Copy точно появилась
+    await delay(3000);
+
+    // 10) Ищем последний контейнер
+    const containerHandles = await page.$$(messageContainerSelector);
+    const lastContainer = containerHandles[containerHandles.length - 1];
+    if (!lastContainer) {
+      console.warn("[fetchFromClaude] No last container!");
+      return "";
+    }
 
     let finalAnswer = "";
     const maxButtonTries = 5;
 
-    const containerHandles = await page.$$(messageContainerSelector);
-    const lastContainer = containerHandles[containerHandles.length - 1];
-    if (!lastContainer) {
-      console.warn("[fetchFromClaude] Could not find the last message container!");
-      finalAnswer = await lastMessageTextFallback(page, messageContainerSelector);
-    } else {
-      for (let k = 0; k < maxButtonTries; k++) {
-        console.log(`[fetchFromClaude] Copy button detection attempt #${k + 1}`);
-        
-        try {
-          // Wait longer for the full response to be rendered
-          await new Promise(resolve => setTimeout(resolve, 3000));
+    // 11) Несколько попыток нажать Copy и проверить _puppeteerClipboard
+    for (let k = 0; k < maxButtonTries; k++) {
+      console.log(`[fetchFromClaude] Copy button detection attempt #${k + 1}`);
+      await delay(2000);
 
-          // First try: Direct text extraction before attempting clipboard
-          const messageText = await lastContainer.evaluate((container) => {
-            const messageContent = container.querySelector('[data-message-content="true"]');
-            if (messageContent) {
-              return messageContent.textContent || '';
-            }
-            return container.textContent || '';
-          });
-
-          if (messageText && messageText.length > 10) {
-            console.log("[fetchFromClaude] Successfully extracted text directly");
-            finalAnswer = messageText;
-            break;
-          }
-
-          // Second try: Clipboard method as fallback
-          const clicked = await lastContainer.evaluate((container) => {
-            const copyButtons = Array.from(container.querySelectorAll('button')).filter(btn => {
-              return btn.textContent?.includes('Copy') || 
-                     btn.getAttribute('aria-label')?.includes('Copy');
-            });
-            
-            if (copyButtons.length > 0) {
-              copyButtons[0].click();
-              return true;
-            }
-            return false;
-          });
-
-          if (clicked) {
-            // Wait longer for clipboard operations
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            const clipboardText = await page.evaluate(async () => {
-              try {
-                return await navigator.clipboard.readText();
-              } catch (e) {
-                console.error('Clipboard error:', e);
-                return '';
-              }
-            });
-
-            if (clipboardText && clipboardText.length > 10) {
-              console.log("[fetchFromClaude] Successfully got text from clipboard");
-              finalAnswer = clipboardText;
-              break;
-            }
-          }
-
-          // If both methods fail, try the fallback extraction
-          if (!finalAnswer) {
-            finalAnswer = await lastMessageTextFallback(page, messageContainerSelector);
-            if (finalAnswer) break;
-          }
-
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-        } catch (e) {
-          console.error("[fetchFromClaude] Error in text extraction attempt:", e);
-          await new Promise(resolve => setTimeout(resolve, 1000));
+      // Нажимаем на кнопку Copy (XPath или fallback)
+      const clicked = await lastContainer.evaluate((container) => {
+        const COPY_BUTTON_XPATH = '/html/body/div[3]/div/div/div[2]/div[1]/div[1]/div[2]/div/div/div[2]/div/div/div[1]/button[1]';
+        const result = document.evaluate(
+          COPY_BUTTON_XPATH,
+          document,
+          null,
+          XPathResult.FIRST_ORDERED_NODE_TYPE,
+          null
+        );
+        const copyButton = result.singleNodeValue as HTMLButtonElement | null;
+        if (copyButton) {
+          copyButton.click();
+          return true;
         }
+
+        const buttons = Array.from(container.querySelectorAll("button"));
+        const fallback = buttons.find((btn) => {
+          const svg = btn.querySelector('svg[viewBox="0 0 256 256"]');
+          const path = btn.querySelector('path[d^="M200,32H163.74"]');
+          return svg && path && btn.textContent?.includes("Copy");
+        });
+        if (fallback) {
+          fallback.click();
+          return true;
+        }
+        return false;
+      });
+
+      if (clicked) {
+        // Ждём, пока сайт что-то скопирует
+        await delay(1500);
+
+        // Берём из _puppeteerClipboard
+        const data = await page.evaluate(() => {
+          return (window as any)._puppeteerClipboard;
+        });
+        if (data && typeof data === "string" && data.trim().length > 0) {
+          finalAnswer = data;
+          console.log(`[fetchFromClaude] Copied text length=${data.length}`);
+          break;
+        } else {
+          console.log("[fetchFromClaude] Copy was clicked but no data in _puppeteerClipboard, retrying...");
+        }
+      } else {
+        console.log("[fetchFromClaude] Copy button not found or not clicked, retrying...");
       }
     }
 
-    // 9) Save cookies
-    console.log("[fetchFromClaude] Saving cookies...");
+    // 12) Если всё ещё пусто - делаем fallback (парсим DOM)
+    if (!finalAnswer) {
+      console.warn("[fetchFromClaude] No data from copy after attempts, fallback to direct DOM extraction");
+      finalAnswer = await lastMessageTextFallback(page, messageContainerSelector);
+    }
+
+    // 13) Сохраняем cookies
     const currentCookies = await page.cookies();
     fs.writeFileSync(CLAUDE_COOKIES_PATH, JSON.stringify(currentCookies, null, 2));
-    console.log("[fetchFromClaude] Cookies saved to claude-cookies.json");
 
-    return finalAnswer || "";
+    return finalAnswer;
   } catch (error) {
     console.error("[fetchFromClaude] Error:", error);
     throw error;
@@ -230,49 +218,23 @@ export async function fetchFromClaude(prompt: string): Promise<string> {
   }
 }
 
-/**
- * lastMessageTextFallback
- * If we fail to click the correct button, we scrape text from the last message container as fallback.
- */
-async function lastMessageTextFallback(
-  page: Page,
-  messageContainerSelector: string
-): Promise<string> {
+async function lastMessageTextFallback(page: any, messageSelector: string): Promise<string> {
   try {
-    const containerHandles = await page.$$(messageContainerSelector);
-    const lastContainer = containerHandles[containerHandles.length - 1];
-    if (!lastContainer) {
-      console.warn("[lastMessageTextFallback] No container found!");
-      return "";
-    }
+    const containers = await page.$$(messageSelector);
+    const last = containers[containers.length - 1];
+    if (!last) return "";
 
-    return await lastContainer.evaluate((container) => {
-      // Try multiple selectors to find the message content
-      const selectors = [
-        '[data-message-content="true"]',
-        '.prose',
-        '.whitespace-pre-wrap',
-        '[data-message-author-role="assistant"]'
-      ];
-
-      for (const selector of selectors) {
-        const element = container.querySelector(selector);
-        if (element) {
-          const clone = element.cloneNode(true) as Element;
-          // Remove any UI elements that might contain unwanted text
-          clone.querySelectorAll('button, svg, .copy-button, [role="button"]').forEach(el => el.remove());
-          const text = clone.textContent?.trim() || '';
-          if (text && text.length > 10) {
-            return text;
-          }
-        }
-      }
-
-      // Last resort: get all text from the container
-      return container.textContent?.trim() || '';
+    return await last.evaluate((node: Element) => {
+      const clean = (text: string) => text.replace(/\s+/g, " ").replace(/\n+/g, "\n").trim();
+      node.querySelectorAll("button, svg, .copy-button, [role='button']").forEach((el) => el.remove());
+      return clean(node.textContent || "");
     });
-  } catch (error) {
-    console.error("[lastMessageTextFallback] Error:", error);
+  } catch (err) {
+    console.error("[lastMessageTextFallback] Error:", err);
     return "";
   }
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
