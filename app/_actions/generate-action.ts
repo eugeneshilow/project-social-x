@@ -1,10 +1,10 @@
 "use server"
 
 import { buildPrompt } from "@/lib/prompt-builder"
+import { fetchFromChatGPT } from "@/lib/puppeteer-chatgpt"
+import { fetchFromClaude } from "@/lib/puppeteer-claude"
 import { telegramPrompt } from "@/prompts/telegram-prompt"
 import { threadsPrompt } from "@/prompts/threads-prompt"
-import { fetchFromClaude } from "@/lib/puppeteer-claude"
-import { fetchFromChatGPT } from "@/lib/puppeteer-chatgpt"
 
 interface GenerateParams {
   referencePost: string
