@@ -2,6 +2,7 @@ import {
     audiencePrompt,
     defaultInfo,
     defaultPostReference,
+    principlesWriteCut,
     situationPrompt,
     systemPrompt,
     textBodyInstructions,
@@ -24,6 +25,7 @@ ${vocabularyPrompt}
 ${situationPrompt}
 ${titleInstructions}
 ${textBodyInstructions}
+${principlesWriteCut}
 ${zenArticleSpecificInstructions}
 ${defaultInfo}
 ${defaultPostReference}` 
