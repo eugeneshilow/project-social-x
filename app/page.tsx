@@ -33,13 +33,6 @@ export default function HomePage() {
       selectedPlatform
     }
 
-    const finalPosts = [
-      {
-        finalPostText: "Example final post text",
-        postedLink: "https://example.com"
-      }
-    ]
-
     const requestData = {
       userId: "demo-user",
       referencePost: formData.referencePost,
@@ -51,7 +44,7 @@ export default function HomePage() {
     const resp = await generateWithRequestAction({
       requestData,
       generateInput,
-      finalPosts
+      finalPosts: []
     })
 
     console.log("[handleGenerate] => generateWithRequestAction =>", resp)
@@ -61,10 +54,10 @@ export default function HomePage() {
       return
     }
 
-    setServerRequestId(resp.data.request.id)
-    setChatGPTOutput(resp.data.generation.chatGPTOutput)
-    setClaudeOutput(resp.data.generation.claudeOutput)
-    setGeminiOutput(resp.data.generation.geminiOutput)
+    setServerRequestId(resp.data?.request.id || "")
+    setChatGPTOutput(resp.data?.generation.chatGPTOutput || "")
+    setClaudeOutput(resp.data?.generation.claudeOutput || "")
+    setGeminiOutput(resp.data?.generation.geminiOutput || "")
   }
 
   function handleOnGenerate(formData: {
