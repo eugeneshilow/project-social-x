@@ -5,6 +5,7 @@ import { createRequest, getRequestById } from "@/db/queries/requests-queries"
 import { createMultipleResultsAction } from "@/actions/db/results-actions"
 import { InsertRequest } from "@/db/schema/requests-schema"
 import { generateAction } from "@/actions/generate-action"
+import { createResponse } from "@/db/queries/responses-queries"
 
 interface GenerateWithRequestParams {
   requestData: InsertRequest
@@ -22,6 +23,7 @@ interface GenerateWithRequestParams {
  * 1) create request row
  * 2) call generateAction
  * 3) insert final posts
+ * 4) insert model responses
  */
 export async function generateWithRequestAction({
   requestData,
@@ -96,6 +98,46 @@ export async function generateWithRequestAction({
     return {
       isSuccess: false,
       message: "Exception while inserting results",
+      data: null
+    }
+  }
+
+  // 4) Insert model responses (if any)
+  try {
+    const { selectedModels } = generateInput
+    console.log("[generateWithRequestAction] Saving raw model outputs to 'responses' table...")
+
+    // ChatGPT
+    if (selectedModels.includes("chatgpt") && generationResults?.chatGPTOutput) {
+      await createResponse({
+        requestId: newRequest.id,
+        model: "chatgpt",
+        output: generationResults.chatGPTOutput
+      })
+    }
+
+    // Claude
+    if (selectedModels.includes("claude") && generationResults?.claudeOutput) {
+      await createResponse({
+        requestId: newRequest.id,
+        model: "claude",
+        output: generationResults.claudeOutput
+      })
+    }
+
+    // Gemini
+    if (selectedModels.includes("gemini") && generationResults?.geminiOutput) {
+      await createResponse({
+        requestId: newRequest.id,
+        model: "gemini",
+        output: generationResults.geminiOutput
+      })
+    }
+  } catch (error) {
+    console.error("[generateWithRequestAction] Error inserting responses =>", error)
+    return {
+      isSuccess: false,
+      message: "Exception while inserting model responses",
       data: null
     }
   }
