@@ -1,12 +1,13 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createResult } from "@/db/queries/results-queries"
-import { InsertResult } from "@/db/schema/results-schema"
+import { eq } from "drizzle-orm"
+import { db } from "@/db/db"
+import { requestsTable } from "@/db/schema/requests-schema"
 
 interface PostItem {
   finalPostText: string
-  postedLink: string
+  postLink: string
 }
 
 interface CreateMultipleResultsParams {
@@ -16,33 +17,48 @@ interface CreateMultipleResultsParams {
 
 /**
  * createMultipleResultsAction
- * Saves an array of final posts in the `results` table, referencing a specific requestId.
+ * Adds final posts (text + link) to the 'finalPosts' array in the 'requests' table.
  */
 export async function createMultipleResultsAction({
   requestId,
   posts
 }: CreateMultipleResultsParams) {
-  console.log("[createMultipleResultsAction] received =>", { requestId, posts })
+  console.log("[createMultipleResultsAction] =>", { requestId, posts })
 
   try {
-    for (const p of posts) {
-      const data: InsertResult = {
-        requestId,
-        finalPostText: p.finalPostText,
-        postedLink: p.postedLink
-      }
-      console.log("[createMultipleResultsAction] Inserting =>", data)
+    // 1) Fetch the existing request
+    const [existing] = await db
+      .select()
+      .from(requestsTable)
+      .where(eq(requestsTable.id, requestId))
 
-      const inserted = await createResult(data)
-      console.log("[createMultipleResultsAction] Insert result =>", inserted)
+    if (!existing) {
+      console.error("[createMultipleResultsAction] => request not found")
+      return { isSuccess: false, message: "Request not found" }
     }
 
-    // Optionally revalidate any path(s) that depend on these results
+    // 2) Combine old finalPosts with new
+    const oldPosts = existing.finalPosts ?? []
+    const newPosts = [...oldPosts, ...posts]
+
+    // 3) Update the row
+    const [updated] = await db
+      .update(requestsTable)
+      .set({ finalPosts: newPosts })
+      .where(eq(requestsTable.id, requestId))
+      .returning()
+
+    // 4) Revalidate
     revalidatePath("/")
 
-    return { isSuccess: true, message: "Results saved successfully" }
+    console.log("[createMultipleResultsAction] => updated:", updated)
+    return {
+      isSuccess: true,
+      message: "Results saved successfully",
+      data: updated
+    }
   } catch (error) {
-    console.error("[createMultipleResultsAction] Error =>", error)
+    console.error("[createMultipleResultsAction] => Error:", error)
     return { isSuccess: false, message: "Failed to save results" }
   }
 }

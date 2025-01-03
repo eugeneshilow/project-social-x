@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, jsonb } from "drizzle-orm/pg-core";
 
 export const requestsTable = pgTable("requests", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -7,6 +7,13 @@ export const requestsTable = pgTable("requests", {
   additionalInfo: text("additional_info"),
   selectedModels: text("selected_models").notNull(),
   options: text("options"),
+
+  // Store final posts (an array/object) from multiple Threads, Telegram posts, etc.
+  finalPosts: jsonb("final_posts"),
+
+  // Store any raw outputs from the chosen models
+  outputs: jsonb("outputs"),
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
