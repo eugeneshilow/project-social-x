@@ -22,6 +22,8 @@ export async function createMultipleResultsAction({
   requestId,
   posts
 }: CreateMultipleResultsParams) {
+  console.log("[createMultipleResultsAction] received =>", { requestId, posts })
+
   try {
     for (const p of posts) {
       const data: InsertResult = {
@@ -29,7 +31,10 @@ export async function createMultipleResultsAction({
         finalPostText: p.finalPostText,
         postedLink: p.postedLink
       }
-      await createResult(data)
+      console.log("[createMultipleResultsAction] Inserting =>", data)
+
+      const inserted = await createResult(data)
+      console.log("[createMultipleResultsAction] Insert result =>", inserted)
     }
 
     // Optionally revalidate any path(s) that depend on these results

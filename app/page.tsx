@@ -1,10 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import InputsForm from "./_components/inputs-form"
-import OutputsSection from "./_components/outputs-section"
-import { generateAction } from "./_actions/generate-action"
-import ResultsSection from "./_components/results-section"
+
+// Updated to new location
+import InputsForm from "@/components/inputs-form"
+import OutputsSection from "@/components/outputs-section"
+import ResultsSection from "@/components/results-section"
+
+import { generateWithRequestAction } from "@/actions/generate-with-request"
 
 export default function HomePage() {
   const [referencePost, setReferencePost] = useState("")
@@ -15,31 +18,53 @@ export default function HomePage() {
   const [geminiOutput, setGeminiOutput] = useState("")
   const [selectedPlatform, setSelectedPlatform] = useState<"threads" | "telegram">("threads")
 
-  // For demonstration, a stable requestId (in real usage, might come from DB after createRequest())
-  const [demoRequestId] = useState(() => crypto.randomUUID())
+  const [serverRequestId, setServerRequestId] = useState("")
 
   async function handleGenerate(formData: {
     referencePost: string
     info: string
     selectedModels: string[]
   }) {
-    console.log("[handleGenerate] Called with formData (latest user input):", formData)
-
-    try {
-      const result = await generateAction({
-        referencePost: formData.referencePost,
-        info: formData.info,
-        selectedModels: formData.selectedModels,
-        selectedPlatform
-      })
-
-      console.log("[handleGenerate] generateAction returned =>", result)
-      setChatGPTOutput(result.chatGPTOutput)
-      setClaudeOutput(result.claudeOutput)
-      setGeminiOutput(result.geminiOutput)
-    } catch (err) {
-      console.error("[handleGenerate] Error calling generateAction:", err)
+    console.log("[handleGenerate] formData =>", formData)
+    const generateInput = {
+      referencePost: formData.referencePost,
+      info: formData.info,
+      selectedModels: formData.selectedModels,
+      selectedPlatform
     }
+
+    const finalPosts = [
+      {
+        finalPostText: "Example final post text",
+        postedLink: "https://example.com"
+      }
+    ]
+
+    const requestData = {
+      userId: "demo-user",
+      referencePost: formData.referencePost,
+      additionalInfo: formData.info,
+      selectedModels: formData.selectedModels.join(","),
+      options: null
+    }
+
+    const resp = await generateWithRequestAction({
+      requestData,
+      generateInput,
+      finalPosts
+    })
+
+    console.log("[handleGenerate] => generateWithRequestAction =>", resp)
+
+    if (!resp.isSuccess) {
+      console.error("[handleGenerate] Flow failed =>", resp.message)
+      return
+    }
+
+    setServerRequestId(resp.data.request.id)
+    setChatGPTOutput(resp.data.generation.chatGPTOutput)
+    setClaudeOutput(resp.data.generation.claudeOutput)
+    setGeminiOutput(resp.data.generation.geminiOutput)
   }
 
   function handleOnGenerate(formData: {
@@ -47,15 +72,13 @@ export default function HomePage() {
     info: string
     selectedModels: string[]
   }) {
-    console.log("[handleOnGenerate] called with =>", formData)
-
     setReferencePost(formData.referencePost)
     setInfo(formData.info)
     setSelectedModels(formData.selectedModels)
-
     setChatGPTOutput("")
     setClaudeOutput("")
     setGeminiOutput("")
+    setServerRequestId("")
 
     void handleGenerate(formData)
   }
@@ -86,11 +109,10 @@ export default function HomePage() {
         geminiOutput={geminiOutput}
       />
 
-      {/* 
-        Pass the requestId along so that any final posts we "save" 
-        will be associated with that request row in DB. 
-      */}
-      <ResultsSection selectedPlatform={selectedPlatform} requestId={demoRequestId} />
+      <ResultsSection
+        selectedPlatform={selectedPlatform}
+        requestId={serverRequestId}
+      />
     </div>
   )
 }

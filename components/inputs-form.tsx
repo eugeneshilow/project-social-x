@@ -15,12 +15,10 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
   const [localInfo, setLocalInfo] = useState("")
   const [selected, setSelected] = useState<string[]>([])
 
-  // We’ll log once on mount to confirm code is updated
   useEffect(() => {
-    console.log("[InputsForm] Component mounted. Make sure you see this in the browser devtools.")
+    console.log("[InputsForm] Component mounted.")
   }, [])
 
-  // Log each time `selected` changes
   useEffect(() => {
     console.log("[InputsForm] selected changed:", selected)
   }, [selected])
@@ -52,7 +50,6 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
     })
   }
 
-  // Extra button to check `selected` in the browser console at any time
   function handleTestClick() {
     console.log("[InputsForm] TEST BUTTON clicked. selected models =>", selected)
   }
@@ -60,18 +57,17 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
   return (
     <div>
       <p className="mb-2 text-sm italic">
-        (Open your browser devtools console to see the debug logs from <b>InputsForm</b>.)
+        (Open your devtools console to see debug logs from <b>InputsForm</b>.)
       </p>
       <button
         type="button"
         className="mb-4 bg-yellow-300 px-3 py-1 rounded"
         onClick={handleTestClick}
       >
-        Test Log `selected` State
+        Test Log `selected`
       </button>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        
         <div>
           <label className="block mb-1 font-semibold">Reference Post</label>
           <textarea

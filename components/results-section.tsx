@@ -13,7 +13,6 @@ export default function ResultsSection({ selectedPlatform, requestId }: ResultsS
     { id: number; finalPostText: string; postLink: string }[]
   >([])
 
-  // For server action calls from a client component:
   const [isPending, startTransition] = useTransition()
   const [saveMessage, setSaveMessage] = useState("")
 
@@ -44,7 +43,6 @@ export default function ResultsSection({ selectedPlatform, requestId }: ResultsS
       : "https://t.me/..."
 
   function handleSaveResults() {
-    // We'll gather the data, then call our server action
     const posts = results.map((r) => ({
       finalPostText: r.finalPostText,
       postedLink: r.postLink
