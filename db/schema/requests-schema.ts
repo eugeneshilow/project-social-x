@@ -8,11 +8,10 @@ export const requestsTable = pgTable("requests", {
   selectedModels: text("selected_models").notNull(),
   options: text("options"),
 
-  // Store final posts (an array/object) from multiple Threads, Telegram posts, etc.
+  // Store final posts (array/object) from multiple platforms
   finalPosts: jsonb("final_posts"),
 
-  // Store any raw outputs from the chosen models
-  outputs: jsonb("outputs"),
+  // Removed: outputs column
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
