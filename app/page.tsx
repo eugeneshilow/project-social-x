@@ -4,7 +4,6 @@ import { useState } from "react"
 import InputsForm from "./_components/inputs-form"
 import OutputsSection from "./_components/outputs-section"
 import { generateAction } from "./_actions/generate-action"
-
 import ResultsSection from "./_components/results-section"
 
 export default function HomePage() {
@@ -15,6 +14,9 @@ export default function HomePage() {
   const [claudeOutput, setClaudeOutput] = useState("")
   const [geminiOutput, setGeminiOutput] = useState("")
   const [selectedPlatform, setSelectedPlatform] = useState<"threads" | "telegram">("threads")
+
+  // For demonstration, a stable requestId (in real usage, might come from DB after createRequest())
+  const [demoRequestId] = useState(() => crypto.randomUUID())
 
   async function handleGenerate(formData: {
     referencePost: string
@@ -46,6 +48,7 @@ export default function HomePage() {
     selectedModels: string[]
   }) {
     console.log("[handleOnGenerate] called with =>", formData)
+
     setReferencePost(formData.referencePost)
     setInfo(formData.info)
     setSelectedModels(formData.selectedModels)
@@ -83,8 +86,11 @@ export default function HomePage() {
         geminiOutput={geminiOutput}
       />
 
-      {/* Pass selectedPlatform to ResultsSection */}
-      <ResultsSection selectedPlatform={selectedPlatform} />
+      {/* 
+        Pass the requestId along so that any final posts we "save" 
+        will be associated with that request row in DB. 
+      */}
+      <ResultsSection selectedPlatform={selectedPlatform} requestId={demoRequestId} />
     </div>
   )
 }

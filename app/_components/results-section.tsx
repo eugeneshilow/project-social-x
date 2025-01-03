@@ -1,26 +1,25 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
+import { createMultipleResultsAction } from "@/actions/db/results-actions"
 
 interface ResultsSectionProps {
   selectedPlatform: "threads" | "telegram"
+  requestId: string
 }
 
-export default function ResultsSection({ selectedPlatform }: ResultsSectionProps) {
-  /**
-   * We'll store an array of final posts.
-   * Each item will have an id, finalPostText, and postLink.
-   */
+export default function ResultsSection({ selectedPlatform, requestId }: ResultsSectionProps) {
   const [results, setResults] = useState<
     { id: number; finalPostText: string; postLink: string }[]
   >([])
 
+  // For server action calls from a client component:
+  const [isPending, startTransition] = useTransition()
+  const [saveMessage, setSaveMessage] = useState("")
+
   function handleAddPost() {
     const newId = results.length > 0 ? results[results.length - 1].id + 1 : 1
-    setResults([
-      ...results,
-      { id: newId, finalPostText: "", postLink: "" }
-    ])
+    setResults([...results, { id: newId, finalPostText: "", postLink: "" }])
   }
 
   function handleRemovePost(id: number) {
@@ -39,23 +38,33 @@ export default function ResultsSection({ selectedPlatform }: ResultsSectionProps
     )
   }
 
-  // Dynamically change the placeholder based on platform
   const linkPlaceholder =
     selectedPlatform === "threads"
       ? "https://threads.net/..."
       : "https://t.me/..."
 
   function handleSaveResults() {
-    console.log("[ResultsSection] Save results clicked!")
-    console.log("Full results =>", results)
-    // TODO: future server action or DB action to save data
+    // We'll gather the data, then call our server action
+    const posts = results.map((r) => ({
+      finalPostText: r.finalPostText,
+      postedLink: r.postLink
+    }))
+
+    startTransition(async () => {
+      setSaveMessage("Saving...")
+      const response = await createMultipleResultsAction({ requestId, posts })
+      if (response.isSuccess) {
+        setSaveMessage("Results saved successfully!")
+      } else {
+        setSaveMessage("Failed to save results.")
+      }
+    })
   }
 
   return (
     <div className="max-w-2xl mx-auto w-full p-4 border rounded-md shadow-sm mt-4">
       <h2 className="text-lg font-bold mb-4">Results</h2>
 
-      {/* Add a button to create new posts */}
       <button
         type="button"
         className="mb-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
@@ -109,13 +118,29 @@ export default function ResultsSection({ selectedPlatform }: ResultsSectionProps
       ))}
 
       {results.length > 0 && (
-        <button
-          type="button"
-          className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-500 transition-colors"
-          onClick={handleSaveResults}
-        >
-          Save All Results
-        </button>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            className="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-500 transition-colors"
+            onClick={handleSaveResults}
+            disabled={isPending}
+          >
+            Save All Results
+          </button>
+          {saveMessage && (
+            <p
+              className={`text-sm ${
+                saveMessage.includes("success")
+                  ? "text-green-600"
+                  : saveMessage.includes("Failed")
+                  ? "text-red-600"
+                  : "text-gray-600"
+              }`}
+            >
+              {saveMessage}
+            </p>
+          )}
+        </div>
       )}
     </div>
   )

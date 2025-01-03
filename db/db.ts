@@ -1,15 +1,20 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
-import * as schema from "@/db/schema";
+import { requestsTable, responsesTable, resultsTable } from "@/db/schema";
+import { config } from "dotenv";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
-/**
- * db.ts
- * Drizzle/PG database instance using Supabase connection string
- * Make sure that process.env.SUPABASE_URL is set in your .env.local
- */
+config({ path: ".env.local" });
 
-const pool = new Pool({
-  connectionString: process.env.SUPABASE_URL
-});
+const schema = {
+  requests: requestsTable,
+  responses: responsesTable,
+  results: resultsTable
+};
 
-export const db = drizzle(pool, { schema });
+// For migrations and seeding (more connections)
+export const migrationClient = postgres(process.env.DATABASE_URL!, { max: 1 });
+
+// For query purposes (fewer connections)
+const queryClient = postgres(process.env.DATABASE_URL!);
+
+export const db = drizzle(queryClient, { schema });
