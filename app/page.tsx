@@ -1,8 +1,12 @@
+// No direct changes required unless you want to display the prompt in the UI.
+// Shown here for completeness and to confirm that the new "prompt" column is
+// populated automatically on the server side via generateWithRequestAction.
+// (If you wish, you could fetch and show the prompt from the request object after creation.)
 "use client"
 
 import { useState } from "react"
 
-// Updated to new location
+// ...
 import InputsForm from "@/components/inputs-form"
 import OutputsSection from "@/components/outputs-section"
 import ResultsSection from "@/components/results-section"
@@ -27,7 +31,16 @@ export default function HomePage() {
     info: string
     selectedModels: string[]
   }) {
-    console.log("[handleGenerate] formData =>", formData)
+    const requestData = {
+      userId: "demo-user",
+      referencePost: formData.referencePost,
+      additionalInfo: formData.info,
+      selectedModels: formData.selectedModels.join(","),
+      options: null,
+      platform: selectedPlatform,
+      // prompt will be built and stored on the server
+      prompt: ""
+    }
 
     const generateInput = {
       referencePost: formData.referencePost,
@@ -36,23 +49,11 @@ export default function HomePage() {
       selectedPlatform
     }
 
-    // Include the platform for DB insertion
-    const requestData = {
-      userId: "demo-user",
-      referencePost: formData.referencePost,
-      additionalInfo: formData.info,
-      selectedModels: formData.selectedModels.join(","),
-      options: null,
-      platform: selectedPlatform
-    }
-
     const resp = await generateWithRequestAction({
       requestData,
       generateInput,
       finalPosts: []
     })
-
-    console.log("[handleGenerate] => generateWithRequestAction =>", resp)
 
     if (!resp.isSuccess) {
       console.error("[handleGenerate] Flow failed =>", resp.message)

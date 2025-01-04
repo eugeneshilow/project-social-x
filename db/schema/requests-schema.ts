@@ -11,8 +11,11 @@ export const requestsTable = pgTable("requests", {
   // Store final posts (array/object) from multiple platforms
   finalPosts: jsonb("final_posts"),
 
-  // NEW COLUMN: platform
+  // platform
   platform: text("platform").notNull().default("threads"),
+
+  // New column to store the exact final prompt used
+  prompt: text("prompt"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
