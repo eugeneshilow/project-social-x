@@ -11,7 +11,8 @@ export const requestsTable = pgTable("requests", {
   // Store final posts (array/object) from multiple platforms
   finalPosts: jsonb("final_posts"),
 
-  // Removed: outputs column
+  // NEW COLUMN: platform
+  platform: text("platform").notNull().default("threads"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")

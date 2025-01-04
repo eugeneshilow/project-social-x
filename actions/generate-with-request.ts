@@ -12,7 +12,7 @@ interface GenerateWithRequestParams {
     referencePost: string
     info: string
     selectedModels: string[]
-    selectedPlatform: "threads" | "telegram"
+    selectedPlatform: "threads" | "telegram" | "threadofthreads"
   }
   finalPosts: { finalPostText: string; postedLink: string }[]
 }

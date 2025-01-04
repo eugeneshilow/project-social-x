@@ -1,0 +1,1 @@
+ALTER TABLE "requests" ADD COLUMN "platform" text DEFAULT 'threads' NOT NULL;

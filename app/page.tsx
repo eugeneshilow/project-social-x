@@ -28,6 +28,7 @@ export default function HomePage() {
     selectedModels: string[]
   }) {
     console.log("[handleGenerate] formData =>", formData)
+
     const generateInput = {
       referencePost: formData.referencePost,
       info: formData.info,
@@ -35,12 +36,14 @@ export default function HomePage() {
       selectedPlatform
     }
 
+    // Include the platform for DB insertion
     const requestData = {
       userId: "demo-user",
       referencePost: formData.referencePost,
       additionalInfo: formData.info,
       selectedModels: formData.selectedModels.join(","),
-      options: null
+      options: null,
+      platform: selectedPlatform
     }
 
     const resp = await generateWithRequestAction({
