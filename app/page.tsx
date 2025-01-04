@@ -9,6 +9,8 @@ import ResultsSection from "@/components/results-section"
 
 import { generateWithRequestAction } from "@/actions/generate-with-request"
 
+type PlatformType = "threads" | "telegram" | "threadofthreads"
+
 export default function HomePage() {
   const [referencePost, setReferencePost] = useState("")
   const [info, setInfo] = useState("")
@@ -16,7 +18,7 @@ export default function HomePage() {
   const [chatGPTOutput, setChatGPTOutput] = useState("")
   const [claudeOutput, setClaudeOutput] = useState("")
   const [geminiOutput, setGeminiOutput] = useState("")
-  const [selectedPlatform, setSelectedPlatform] = useState<"threads" | "telegram">("threads")
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>("threads")
 
   const [serverRequestId, setServerRequestId] = useState("")
 
@@ -86,10 +88,11 @@ export default function HomePage() {
           <select
             className="border rounded p-2"
             value={selectedPlatform}
-            onChange={(e) => setSelectedPlatform(e.target.value as "threads" | "telegram")}
+            onChange={(e) => setSelectedPlatform(e.target.value as PlatformType)}
           >
             <option value="threads">Threads Prompt</option>
             <option value="telegram">Telegram Prompt</option>
+            <option value="threadofthreads">Thread of Threads Prompt</option>
           </select>
         </div>
 

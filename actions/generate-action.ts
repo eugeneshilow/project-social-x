@@ -6,12 +6,13 @@ import { fetchFromChatGPT } from "@/lib/puppeteer-chatgpt"
 import { fetchFromClaude } from "@/lib/puppeteer-claude"
 import { telegramPrompt } from "@/prompts/telegram-prompt"
 import { threadsPrompt } from "@/prompts/threads-prompt"
+import { threadofthreadsPrompt } from "@/prompts/threadofthreads-prompt"
 
 interface GenerateParams {
   referencePost: string
   info: string
   selectedModels: string[]
-  selectedPlatform: "threads" | "telegram"
+  selectedPlatform: "threads" | "telegram" | "threadofthreads"
 }
 
 export async function generateAction({
@@ -28,7 +29,12 @@ export async function generateAction({
   })
 
   // 1. Choose system prompt
-  const systemPrompt = selectedPlatform === "threads" ? threadsPrompt : telegramPrompt
+  let systemPrompt = threadsPrompt
+  if (selectedPlatform === "telegram") {
+    systemPrompt = telegramPrompt
+  } else if (selectedPlatform === "threadofthreads") {
+    systemPrompt = threadofthreadsPrompt
+  }
 
   // 2. Build final prompt
   const finalPrompt = buildPrompt(systemPrompt, referencePost, info)
