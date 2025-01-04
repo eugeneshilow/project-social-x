@@ -95,7 +95,7 @@ export async function fetchFromChatGPT(prompt: string): Promise<string> {
  */
 async function waitForCompletion(page: Page) {
   const start = Date.now();
-  const maxMs = 240000;
+  const maxMs = 360000;
   let sawStop = false;
 
   while (true) {

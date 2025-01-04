@@ -19,11 +19,12 @@ import {
 
 const telegramSpecificInstructions = `<telegram-instructions>
 It will posted on Telegram. 
-- keep under 4096 characters (but don't force to near the limit, do as much text as necessary)
+${/* - keep under 4096 characters (but don't force to near the limit, do as much text as necessary) */``}
 - use telegram-formatting-instructions to properly format the text 
-- Offer 3 drastically different versions of the post (firstsentence + textbody). Make one version which must be maximally close to the reference but in Russian
+${/* - Offer 3 drastically different versions of the post (firstsentence + textbody). Make one version which must be maximally close to the reference but in Russian */``}
 - Visually add structure with bullet, dashes, relevant emojies
-- Be structured
+- Be highly structured
+- Don't be lazy and output the answer in full. If it's a long list of items in reference post, be 100% sure to post all of the items on the list.
 
 <telegram-formatting-instructions>
 Bold: **Bold text**

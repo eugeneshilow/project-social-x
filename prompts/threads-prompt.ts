@@ -30,6 +30,8 @@ If there is some sort of CTA (like a link of something like that), mention it in
 And make a second post with that CTA. 
 
 Also, last post should be something to prompt the user to subscribe or like or comment or save or repost or a some combination of those. Also you may byte people for comments if it makes sense.
+
+In the end of every post add 1 relevant #tag (make use of Russian tags as well like #ИИ). Separate by an empty line before the tag.
 </threads-instructions>`
 
 export const threadsPrompt = `${systemPrompt}

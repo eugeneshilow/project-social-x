@@ -1,7 +1,10 @@
 export const systemPrompt = `<system-prompt>
 situation - this information should not be mentioned directly in the post. It's for your general context
 info - general information for the post you need to write [may be absent]
-post-reference - use this as an example of how the final post should look. post-reference includes both title and text-body
+
+post-reference - use this as an example of how the final post should look. post-reference includes both title and text-body.
+you must unclude everything in the post-reference in your final post.
+
 textbody-instructions - actually how to write the
 </system-prompt>`
 
@@ -12,6 +15,7 @@ export const audiencePrompt = `<audience>
 
 export const vocabularyPrompt = `<vocabulary>
 - prefer ИИ to "AI"
+- convert dollar values to rubles where relevant, also change the scale of amounts accordingly if makes sense in the particular situation (for example, SAAS of $20/month would be around 490 rubles/month in Russia's reality)
 </vocabulary>`
 
 export const situationPrompt = `<situation>
