@@ -8,7 +8,7 @@ import {
     textBodyInstructions,
     titleInstructions,
     vocabularyPrompt
-} from "./system-prompts"
+} from "./ru-system-prompts"
 
 const zenPostSpecificInstructions = `<zen-post-instructions>
 It will be posted on Yandex Zen as a post: 
@@ -27,4 +27,4 @@ ${textBodyInstructions}
 ${principlesWriteCut}
 ${zenPostSpecificInstructions}
 ${defaultInfo}
-${defaultPostReference}` 
+${defaultPostReference}`

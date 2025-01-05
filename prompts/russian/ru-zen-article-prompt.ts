@@ -8,7 +8,7 @@ import {
     textBodyInstructions,
     titleInstructions,
     vocabularyPrompt
-} from "./system-prompts"
+} from "./ru-system-prompts"
 
 const zenArticleSpecificInstructions = `<zen-article-instructions>
 It will be posted on Yandex Zen as a full article: 
@@ -28,4 +28,4 @@ ${textBodyInstructions}
 ${principlesWriteCut}
 ${zenArticleSpecificInstructions}
 ${defaultInfo}
-${defaultPostReference}` 
+${defaultPostReference}`

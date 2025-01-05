@@ -8,7 +8,7 @@ import {
     textBodyInstructions,
     titleInstructions,
     vocabularyPrompt
-} from "./system-prompts"
+} from "./ru-system-prompts"
 
 const threadsOfThreadsSpecificInstructions = `
 
@@ -42,4 +42,5 @@ ${textBodyInstructions}
 ${principlesWriteCut}
 ${threadsOfThreadsSpecificInstructions}
 ${defaultInfo}
-${defaultPostReference}`
+${defaultPostReference}
+`
