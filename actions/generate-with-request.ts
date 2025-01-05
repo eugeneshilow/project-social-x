@@ -15,6 +15,7 @@ interface GenerateWithRequestParams {
     selectedModels: string[]
     selectedPlatform: string
     selectedLanguage: string
+    summarizeInfo?: string
   }
   finalPosts: { finalPostText: string; postedLink: string }[]
 }
@@ -32,7 +33,6 @@ export async function generateWithRequestAction({
 
   const { selectedPlatform, selectedLanguage } = generateInput
 
-  // 1) Dynamically import the relevant system prompt
   let systemPrompt = ""
   try {
     if (selectedLanguage === "russian") {
@@ -97,7 +97,12 @@ export async function generateWithRequestAction({
   }
 
   // 2) Build final prompt
-  const finalPrompt = buildPrompt(systemPrompt, generateInput.referencePost, generateInput.info)
+  const finalPrompt = buildPrompt(
+    systemPrompt,
+    generateInput.referencePost,
+    generateInput.info,
+    generateInput.summarizeInfo || ""
+  )
 
   // 3) create request row with final prompt
   let newRequest

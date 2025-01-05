@@ -18,6 +18,7 @@ type PlatformType =
 export default function HomePage() {
   const [referencePost, setReferencePost] = useState("")
   const [info, setInfo] = useState("")
+  const [summarizeInfo, setSummarizeInfo] = useState("")
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageType>("russian")
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>("threads")
@@ -31,6 +32,7 @@ export default function HomePage() {
     referencePost: string
     info: string
     selectedModels: string[]
+    summarizeInfo: string
   }) {
     const requestData = {
       userId: "demo-user",
@@ -38,8 +40,8 @@ export default function HomePage() {
       additionalInfo: formData.info,
       selectedModels: formData.selectedModels.join(","),
       options: null,
-      platform: selectedPlatform, // new
-      prompt: "" // built on server
+      platform: selectedPlatform,
+      prompt: ""
     }
 
     const generateInput = {
@@ -47,7 +49,8 @@ export default function HomePage() {
       info: formData.info,
       selectedModels: formData.selectedModels,
       selectedPlatform,
-      selectedLanguage  // pass language choice
+      selectedLanguage,
+      summarizeInfo: formData.summarizeInfo
     }
 
     const resp = await generateWithRequestAction({
@@ -71,9 +74,11 @@ export default function HomePage() {
     referencePost: string
     info: string
     selectedModels: string[]
+    summarizeInfo: string
   }) {
     setReferencePost(formData.referencePost)
     setInfo(formData.info)
+    setSummarizeInfo(formData.summarizeInfo)
     setSelectedModels(formData.selectedModels)
     setChatGPTOutput("")
     setClaudeOutput("")

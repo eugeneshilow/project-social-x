@@ -40,13 +40,13 @@ Finalize/revise headline after writing main text to better capture its essence *
 
 export const textBodyInstructions = `<textbody-instructions>
 - Follow Maxim Ilyakhov's "Пиши Сокращай" book principles, more on that in principles-write-cut. 
-Also a meta-advice for you - write in the style this principles-write-cut are written
+- Also a meta-advice for you - write in the style this principles-write-cut are written
+- Write in Russian (include English terms where appropriate)
 
 ${/* 
 - Use dry humor and "no fluff" Twitter-style, but only in Russian
 - Structure: 1-3 lines per paragraph
 - Use plain Russian, be concise—no fluff or extra words
-- Write in Russian (include English terms where appropriate)
 - Ensure reader gets one key takeaway
 - No bullshit
 - add a little bit of Artemy Lebedev writing style

@@ -7,12 +7,14 @@ interface InputsFormProps {
     referencePost: string
     info: string
     selectedModels: string[]
+    summarizeInfo: string
   }) => void
 }
 
 export default function InputsForm({ onGenerate }: InputsFormProps) {
   const [localReferencePost, setLocalReferencePost] = useState("")
   const [localInfo, setLocalInfo] = useState("")
+  const [summarizeInfo, setSummarizeInfo] = useState("")
   const [selected, setSelected] = useState<string[]>([])
 
   useEffect(() => {
@@ -33,7 +35,8 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
     onGenerate({
       referencePost: localReferencePost,
       info: localInfo,
-      selectedModels: selected
+      selectedModels: selected,
+      summarizeInfo
     })
   }
 
@@ -62,6 +65,18 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
             onChange={(e) => setLocalInfo(e.target.value)}
             className="w-full border border-gray-300 rounded p-2"
             placeholder="Enter additional info or instructions..."
+            rows={3}
+          />
+        </div>
+
+        {/* Summarize Info field */}
+        <div>
+          <label className="block mb-1 font-semibold">Summarize Info</label>
+          <textarea
+            value={summarizeInfo}
+            onChange={(e) => setSummarizeInfo(e.target.value)}
+            className="w-full border border-gray-300 rounded p-2"
+            placeholder="Enter content to be summarized..."
             rows={3}
           />
         </div>
