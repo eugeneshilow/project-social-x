@@ -1,6 +1,7 @@
 import {
     audiencePrompt,
     defaultInfo,
+    defaultInformationToSummarize,
     defaultPostReference,
     principlesWriteCut,
     situationPrompt,
@@ -27,4 +28,5 @@ ${textBodyInstructions}
 ${principlesWriteCut}
 ${zenPostSpecificInstructions}
 ${defaultInfo}
+${defaultInformationToSummarize}
 ${defaultPostReference}`

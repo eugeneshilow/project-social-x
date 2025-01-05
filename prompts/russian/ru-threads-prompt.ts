@@ -1,6 +1,7 @@
 import {
     audiencePrompt,
     defaultInfo,
+    defaultInformationToSummarize,
     defaultPostReference,
     principlesWriteCut,
     situationPrompt,
@@ -33,4 +34,5 @@ ${textBodyInstructions}
 ${principlesWriteCut}
 ${threadsSpecificInstructions}
 ${defaultInfo}
+${defaultInformationToSummarize}
 ${defaultPostReference}`

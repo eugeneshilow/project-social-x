@@ -1,6 +1,7 @@
 import {
     audiencePrompt,
     defaultInfo,
+    defaultInformationToSummarize,
     defaultPostReference,
     situationPrompt,
     systemPrompt,
@@ -42,4 +43,5 @@ ${titleInstructions}
 ${textBodyInstructions}
 ${linkedinSpecificInstructions}
 ${defaultInfo}
+${defaultInformationToSummarize}
 ${defaultPostReference}`

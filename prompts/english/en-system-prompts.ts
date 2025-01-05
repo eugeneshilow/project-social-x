@@ -6,8 +6,9 @@ Placeholder for English system prompt
 `
 
 export const systemPrompt = `<system-prompt>
-situation - this information should not be mentioned directly in the post. It's for your general context
-info - general information for the post you need to write [may be absent]
+situation [may be absent] - this information should not be mentioned directly in the post. It's for your general context
+info [may be absent] - general information for the post you need to write, includes in the very beginning the instructions of what exactly needs to be done with this information. 
+information-to-summarize [may be absent] - write a summary of the information in this section for a viral post. Continue to follow all other instructions in other parts of the prompt though.
 
 post-reference - use this as an example of how the final post should look. post-reference includes both title and text-body.
 you must include everything in the post-reference in your final post.
@@ -56,3 +57,6 @@ export const defaultInfo = `<info>
 
 export const defaultPostReference = `<post-reference>
 </post-reference>`
+
+export const defaultInformationToSummarize = `<information-to-summarize>
+</information-to-summarize>`

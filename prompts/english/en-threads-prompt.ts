@@ -1,6 +1,7 @@
 import {
     audiencePrompt,
     defaultInfo,
+    defaultInformationToSummarize,
     defaultPostReference,
     situationPrompt,
     systemPrompt,
@@ -31,4 +32,5 @@ ${titleInstructions}
 ${textBodyInstructions}
 ${threadsSpecificInstructions}
 ${defaultInfo}
+${defaultInformationToSummarize}
 ${defaultPostReference}`

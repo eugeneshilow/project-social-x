@@ -1,6 +1,7 @@
 import {
     audiencePrompt,
     defaultInfo,
+    defaultInformationToSummarize,
     defaultPostReference,
     situationPrompt,
     systemPrompt,
@@ -37,4 +38,5 @@ ${titleInstructions}
 ${textBodyInstructions}
 ${telegramSpecificInstructions}
 ${defaultInfo}
+${defaultInformationToSummarize}
 ${defaultPostReference}`

@@ -1,6 +1,7 @@
 import {
     audiencePrompt,
     defaultInfo,
+    defaultInformationToSummarize,
     defaultPostReference,
     principlesWriteCut,
     situationPrompt,
@@ -33,7 +34,7 @@ In the end of every post add 1 relevant #tag (make use of Russian tags as well l
 </threads-instructions>
 `
 
-export const threadofthreadsPrompt = `${systemPrompt}
+export const threadOfThreadsPrompt = `${systemPrompt}
 ${audiencePrompt}
 ${vocabularyPrompt}
 ${situationPrompt}
@@ -42,5 +43,5 @@ ${textBodyInstructions}
 ${principlesWriteCut}
 ${threadsOfThreadsSpecificInstructions}
 ${defaultInfo}
-${defaultPostReference}
-`
+${defaultInformationToSummarize}
+${defaultPostReference}`
