@@ -23,7 +23,7 @@ Also, last post should be something to prompt the user to subscribe or like or c
 In the end of every post add 1 relevant #tag. Separate by an empty line before the tag.
 </threads-instructions>`
 
-export const threadsPrompt = `${systemPrompt}
+export const ENThreadsPrompt = `${systemPrompt}
 ${audiencePrompt}
 ${vocabularyPrompt}
 ${situationPrompt}
