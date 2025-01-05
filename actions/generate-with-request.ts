@@ -7,61 +7,121 @@ import { InsertRequest } from "@/db/schema/requests-schema"
 import { generateAction } from "@/actions/generate-action"
 import { buildPrompt } from "@/lib/prompt-builder"
 
+// Enhanced to accept language as well
 interface GenerateWithRequestParams {
   requestData: InsertRequest
   generateInput: {
     referencePost: string
     info: string
     selectedModels: string[]
-    selectedPlatform: "threads" | "telegram" | "threadofthreads"
+    selectedPlatform: string
+    selectedLanguage: string
   }
   finalPosts: { finalPostText: string; postedLink: string }[]
 }
 
 /**
  * generateWithRequestAction
- * 1) Build final prompt
- * 2) create request row with that final prompt
- * 3) call generateAction
- * 4) insert final posts
+ * 1) Pick the correct system prompt based on selectedLanguage + selectedPlatform
+ * 2) Build final prompt
+ * 3) create request row with that final prompt
+ * 4) call generateAction
+ * 5) insert final posts
  */
 export async function generateWithRequestAction({
   requestData,
   generateInput,
   finalPosts
 }: GenerateWithRequestParams) {
-  console.log("[generateWithRequestAction] Starting =>", {
+  console.log("[generateWithRequestAction] =>", {
     requestData,
     generateInput,
     finalPosts
   })
 
-  // 1) Build final prompt here
-  // Choose the system prompt for clarity (threads, telegram, or threadofthreads)
+  const { selectedPlatform, selectedLanguage } = generateInput
+
+  // 1) Dynamically import the relevant system prompt
   let systemPrompt = ""
-  if (generateInput.selectedPlatform === "threads") {
-    // Import threadsPrompt inline or from your existing logic
-    const { threadsPrompt } = await import("@/prompts/threads-prompt")
-    systemPrompt = threadsPrompt
-  } else if (generateInput.selectedPlatform === "telegram") {
-    const { telegramPrompt } = await import("@/prompts/telegram-prompt")
-    systemPrompt = telegramPrompt
-  } else {
-    const { threadofthreadsPrompt } = await import("@/prompts/threadofthreads-prompt")
-    systemPrompt = threadofthreadsPrompt
+  try {
+    if (selectedLanguage === "russian") {
+      if (selectedPlatform === "threads") {
+        const { threadsPrompt } = await import("@/prompts/russian/ru-threads-prompt")
+        systemPrompt = threadsPrompt
+      } else if (selectedPlatform === "telegram") {
+        const { telegramPrompt } = await import("@/prompts/russian/ru-telegram-prompt")
+        systemPrompt = telegramPrompt
+      } else if (selectedPlatform === "threadofthreads") {
+        const { threadofthreadsPrompt } = await import("@/prompts/russian/ru-threadofthreads-prompt")
+        systemPrompt = threadofthreadsPrompt
+      } else if (selectedPlatform === "zen-article") {
+        const { zenArticlePrompt } = await import("@/prompts/russian/ru-zen-article-prompt")
+        systemPrompt = zenArticlePrompt
+      } else if (selectedPlatform === "zen-post") {
+        const { zenPostPrompt } = await import("@/prompts/russian/ru-zen-post-prompt")
+        systemPrompt = zenPostPrompt
+      } else if (selectedPlatform === "linkedin") {
+        // No direct RU LinkedIn prompt, fallback
+        console.log("[generateWithRequestAction] Russian + LinkedIn => fallback to threads prompt or custom logic")
+        const { threadsPrompt } = await import("@/prompts/russian/ru-threads-prompt")
+        systemPrompt = threadsPrompt
+      } else {
+        // default fallback
+        const { threadsPrompt } = await import("@/prompts/russian/ru-threads-prompt")
+        systemPrompt = threadsPrompt
+      }
+    } else {
+      // English
+      if (selectedPlatform === "threads") {
+        const { ENThreadsPrompt } = await import("@/prompts/english/en-threads-prompt")
+        systemPrompt = ENThreadsPrompt
+      } else if (selectedPlatform === "telegram") {
+        const { ENTelegramPrompt } = await import("@/prompts/english/en-telegram-prompt")
+        systemPrompt = ENTelegramPrompt
+      } else if (selectedPlatform === "linkedin") {
+        const { ENLinkedInPrompt } = await import("@/prompts/english/en-linkedin-prompt")
+        systemPrompt = ENLinkedInPrompt
+      } else if (selectedPlatform === "threadofthreads") {
+        // No direct EN version yet; fallback or custom
+        console.log("[generateWithRequestAction] English + ThreadOfThreads => fallback to EN Threads Prompt")
+        const { ENThreadsPrompt } = await import("@/prompts/english/en-threads-prompt")
+        systemPrompt = ENThreadsPrompt
+      } else if (selectedPlatform === "zen-article") {
+        // No direct EN version yet
+        console.log("[generateWithRequestAction] English + Zen-article => fallback to EN Threads Prompt")
+        const { ENThreadsPrompt } = await import("@/prompts/english/en-threads-prompt")
+        systemPrompt = ENThreadsPrompt
+      } else if (selectedPlatform === "zen-post") {
+        // No direct EN version yet
+        console.log("[generateWithRequestAction] English + Zen-post => fallback to EN Threads Prompt")
+        const { ENThreadsPrompt } = await import("@/prompts/english/en-threads-prompt")
+        systemPrompt = ENThreadsPrompt
+      } else {
+        // default fallback
+        const { ENThreadsPrompt } = await import("@/prompts/english/en-threads-prompt")
+        systemPrompt = ENThreadsPrompt
+      }
+    }
+  } catch (err) {
+    console.error("[generateWithRequestAction] Error loading system prompt =>", err)
+    return {
+      isSuccess: false,
+      message: "Failed to load system prompt dynamically",
+      data: null
+    }
   }
 
+  // 2) Build final prompt
   const finalPrompt = buildPrompt(systemPrompt, generateInput.referencePost, generateInput.info)
 
-  // 2) create request row with final prompt
+  // 3) create request row with final prompt
   let newRequest
   try {
     const insertResult = await createRequest({
       ...requestData,
-      prompt: finalPrompt
+      prompt: finalPrompt // store final prompt
     })
     newRequest = insertResult[0]
-    console.log("[generateWithRequestAction] Inserted newRequest =>", newRequest)
   } catch (error) {
     console.error("[generateWithRequestAction] Error inserting request =>", error)
     return {
@@ -74,7 +134,7 @@ export async function generateWithRequestAction({
   // Re-check DB existence
   const recheck = await getRequestById(newRequest.id)
   if (!recheck) {
-    console.error("[generateWithRequestAction] Request row NOT found after insertion!")
+    console.error("[generateWithRequestAction] Request not found after insertion!")
     return {
       isSuccess: false,
       message: "Request row not found after insertion",
@@ -82,12 +142,15 @@ export async function generateWithRequestAction({
     }
   }
 
-  // 3) generate content (pass finalPrompt so we skip building it again)
+  // 4) generate content
   let generationResults
   try {
     console.log("[generateWithRequestAction] => calling generateAction with prebuiltPrompt")
     generationResults = await generateAction({
-      ...generateInput,
+      referencePost: generateInput.referencePost,
+      info: generateInput.info,
+      selectedModels: generateInput.selectedModels,
+      selectedPlatform: generateInput.selectedPlatform as "threads"|"telegram"|"threadofthreads", // type assertion if needed
       prebuiltPrompt: finalPrompt
     })
   } catch (error) {
@@ -99,7 +162,7 @@ export async function generateWithRequestAction({
     }
   }
 
-  // 4) Insert final posts referencing the request row
+  // 5) Insert final posts referencing the request
   try {
     const resultsResp = await createMultipleResultsAction({
       requestId: newRequest.id,
@@ -116,7 +179,7 @@ export async function generateWithRequestAction({
     console.error("[generateWithRequestAction] Error inserting results =>", error)
     return {
       isSuccess: false,
-      message: "Exception while inserting results",
+      message: "Exception inserting results",
       data: null
     }
   }

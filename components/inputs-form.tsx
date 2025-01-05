@@ -16,33 +16,20 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
   const [selected, setSelected] = useState<string[]>([])
 
   useEffect(() => {
-    console.log("[InputsForm] Component mounted.")
+    console.log("[InputsForm] mounted.")
   }, [])
 
-  useEffect(() => {
-    console.log("[InputsForm] selected changed:", selected)
-  }, [selected])
-
   function handleCheckboxChange(model: string) {
-    console.log("[InputsForm] handleCheckboxChange called for:", model)
     setSelected((prev) => {
       const alreadySelected = prev.includes(model)
-      let newList
-      if (alreadySelected) {
-        newList = prev.filter((m) => m !== model)
-      } else {
-        newList = [...prev, model]
-      }
-      console.log("[InputsForm] Toggling model:", model, " old:", prev, " new:", newList)
-      return newList
+      return alreadySelected
+        ? prev.filter((m) => m !== model)
+        : [...prev, model]
     })
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    console.log("[InputsForm] handleSubmit triggered, final 'selected':", selected)
-    console.log("[InputsForm] localReferencePost:", localReferencePost)
-    console.log("[InputsForm] localInfo:", localInfo)
     onGenerate({
       referencePost: localReferencePost,
       info: localInfo,
@@ -50,32 +37,18 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
     })
   }
 
-  function handleTestClick() {
-    console.log("[InputsForm] TEST BUTTON clicked. selected models =>", selected)
-  }
-
   return (
     <div>
       <p className="mb-2 text-sm italic">
-        (Open your devtools console to see debug logs from <b>InputsForm</b>.)
+        (Open devtools console to see debug logs from <b>InputsForm</b>.)
       </p>
-      <button
-        type="button"
-        className="mb-4 bg-yellow-300 px-3 py-1 rounded"
-        onClick={handleTestClick}
-      >
-        Test Log `selected`
-      </button>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div>
           <label className="block mb-1 font-semibold">Reference Post</label>
           <textarea
             value={localReferencePost}
-            onChange={(e) => {
-              setLocalReferencePost(e.target.value)
-              console.log("[InputsForm] localReferencePost changed:", e.target.value)
-            }}
+            onChange={(e) => setLocalReferencePost(e.target.value)}
             className="w-full border border-gray-300 rounded p-2"
             placeholder="Enter the reference post here..."
             rows={3}
@@ -86,12 +59,9 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
           <label className="block mb-1 font-semibold">Additional Info</label>
           <textarea
             value={localInfo}
-            onChange={(e) => {
-              setLocalInfo(e.target.value)
-              console.log("[InputsForm] localInfo changed:", e.target.value)
-            }}
+            onChange={(e) => setLocalInfo(e.target.value)}
             className="w-full border border-gray-300 rounded p-2"
-            placeholder="Enter any additional info or instructions..."
+            placeholder="Enter additional info or instructions..."
             rows={3}
           />
         </div>
@@ -128,14 +98,12 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
           </div>
         </div>
 
-        <div>
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-500 transition-colors"
-          >
-            Generate
-          </button>
-        </div>
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded shadow hover:bg-blue-500 transition-colors"
+        >
+          Generate
+        </button>
       </form>
     </div>
   )

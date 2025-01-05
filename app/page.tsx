@@ -1,29 +1,30 @@
-// No direct changes required unless you want to display the prompt in the UI.
-// Shown here for completeness and to confirm that the new "prompt" column is
-// populated automatically on the server side via generateWithRequestAction.
-// (If you wish, you could fetch and show the prompt from the request object after creation.)
 "use client"
 
 import { useState } from "react"
-
-// ...
 import InputsForm from "@/components/inputs-form"
 import OutputsSection from "@/components/outputs-section"
 import ResultsSection from "@/components/results-section"
-
 import { generateWithRequestAction } from "@/actions/generate-with-request"
 
-type PlatformType = "threads" | "telegram" | "threadofthreads"
+type LanguageType = "russian" | "english"
+type PlatformType = 
+  | "threads" 
+  | "telegram" 
+  | "threadofthreads" 
+  | "zen-article" 
+  | "zen-post"
+  | "linkedin" // etc. add more as needed
 
 export default function HomePage() {
   const [referencePost, setReferencePost] = useState("")
   const [info, setInfo] = useState("")
   const [selectedModels, setSelectedModels] = useState<string[]>([])
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageType>("russian")
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>("threads")
+
   const [chatGPTOutput, setChatGPTOutput] = useState("")
   const [claudeOutput, setClaudeOutput] = useState("")
   const [geminiOutput, setGeminiOutput] = useState("")
-  const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>("threads")
-
   const [serverRequestId, setServerRequestId] = useState("")
 
   async function handleGenerate(formData: {
@@ -37,16 +38,16 @@ export default function HomePage() {
       additionalInfo: formData.info,
       selectedModels: formData.selectedModels.join(","),
       options: null,
-      platform: selectedPlatform,
-      // prompt will be built and stored on the server
-      prompt: ""
+      platform: selectedPlatform, // new
+      prompt: "" // built on server
     }
 
     const generateInput = {
       referencePost: formData.referencePost,
       info: formData.info,
       selectedModels: formData.selectedModels,
-      selectedPlatform
+      selectedPlatform,
+      selectedLanguage  // pass language choice
     }
 
     const resp = await generateWithRequestAction({
@@ -87,19 +88,37 @@ export default function HomePage() {
       <div className="max-w-2xl mx-auto w-full p-4 border rounded-md shadow-sm">
         <h1 className="text-xl font-bold mb-4">Automated Post Generation</h1>
 
+        {/* Language selection */}
         <div className="mb-4">
-          <label className="block mb-2 font-semibold">Select Prompt Template:</label>
+          <label className="block mb-2 font-semibold">Select Language:</label>
           <select
-            className="border rounded p-2"
+            className="border rounded p-2 w-full"
+            value={selectedLanguage}
+            onChange={(e) => setSelectedLanguage(e.target.value as LanguageType)}
+          >
+            <option value="russian">Russian</option>
+            <option value="english">English</option>
+          </select>
+        </div>
+
+        {/* Platform selection */}
+        <div className="mb-4">
+          <label className="block mb-2 font-semibold">Select Platform Prompt:</label>
+          <select
+            className="border rounded p-2 w-full"
             value={selectedPlatform}
             onChange={(e) => setSelectedPlatform(e.target.value as PlatformType)}
           >
             <option value="threads">Threads Prompt</option>
             <option value="telegram">Telegram Prompt</option>
             <option value="threadofthreads">Thread of Threads Prompt</option>
+            <option value="zen-article">Zen Article Prompt</option>
+            <option value="zen-post">Zen Post Prompt</option>
+            <option value="linkedin">LinkedIn Prompt</option>
           </select>
         </div>
 
+        {/* Existing inputs form */}
         <InputsForm onGenerate={handleOnGenerate} />
       </div>
 
