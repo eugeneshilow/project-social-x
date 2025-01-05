@@ -7,15 +7,12 @@ export const requestsTable = pgTable("requests", {
   additionalInfo: text("additional_info"),
   selectedModels: text("selected_models").notNull(),
   options: text("options"),
-
-  // Store final posts (array/object) from multiple platforms
   finalPosts: jsonb("final_posts"),
-
-  // platform
   platform: text("platform").notNull().default("threads"),
-
-  // New column to store the exact final prompt used
   prompt: text("prompt"),
+
+  // New column: store "eng" or "rus"
+  language: text("language").notNull().default("rus"),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")

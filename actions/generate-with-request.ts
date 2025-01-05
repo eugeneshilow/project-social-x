@@ -7,7 +7,6 @@ import { InsertRequest } from "@/db/schema/requests-schema"
 import { generateAction } from "@/actions/generate-action"
 import { buildPrompt } from "@/lib/prompt-builder"
 
-// Enhanced to accept language as well
 interface GenerateWithRequestParams {
   requestData: InsertRequest
   generateInput: {
@@ -20,14 +19,6 @@ interface GenerateWithRequestParams {
   finalPosts: { finalPostText: string; postedLink: string }[]
 }
 
-/**
- * generateWithRequestAction
- * 1) Pick the correct system prompt based on selectedLanguage + selectedPlatform
- * 2) Build final prompt
- * 3) create request row with that final prompt
- * 4) call generateAction
- * 5) insert final posts
- */
 export async function generateWithRequestAction({
   requestData,
   generateInput,
@@ -61,12 +52,10 @@ export async function generateWithRequestAction({
         const { zenPostPrompt } = await import("@/prompts/russian/ru-zen-post-prompt")
         systemPrompt = zenPostPrompt
       } else if (selectedPlatform === "linkedin") {
-        // No direct RU LinkedIn prompt, fallback
-        console.log("[generateWithRequestAction] Russian + LinkedIn => fallback to threads prompt or custom logic")
+        console.log("[generateWithRequestAction] Russian + LinkedIn => fallback to threads prompt")
         const { threadsPrompt } = await import("@/prompts/russian/ru-threads-prompt")
         systemPrompt = threadsPrompt
       } else {
-        // default fallback
         const { threadsPrompt } = await import("@/prompts/russian/ru-threads-prompt")
         systemPrompt = threadsPrompt
       }
@@ -82,22 +71,18 @@ export async function generateWithRequestAction({
         const { ENLinkedInPrompt } = await import("@/prompts/english/en-linkedin-prompt")
         systemPrompt = ENLinkedInPrompt
       } else if (selectedPlatform === "threadofthreads") {
-        // No direct EN version yet; fallback or custom
         console.log("[generateWithRequestAction] English + ThreadOfThreads => fallback to EN Threads Prompt")
         const { ENThreadsPrompt } = await import("@/prompts/english/en-threads-prompt")
         systemPrompt = ENThreadsPrompt
       } else if (selectedPlatform === "zen-article") {
-        // No direct EN version yet
         console.log("[generateWithRequestAction] English + Zen-article => fallback to EN Threads Prompt")
         const { ENThreadsPrompt } = await import("@/prompts/english/en-threads-prompt")
         systemPrompt = ENThreadsPrompt
       } else if (selectedPlatform === "zen-post") {
-        // No direct EN version yet
         console.log("[generateWithRequestAction] English + Zen-post => fallback to EN Threads Prompt")
         const { ENThreadsPrompt } = await import("@/prompts/english/en-threads-prompt")
         systemPrompt = ENThreadsPrompt
       } else {
-        // default fallback
         const { ENThreadsPrompt } = await import("@/prompts/english/en-threads-prompt")
         systemPrompt = ENThreadsPrompt
       }
@@ -119,7 +104,8 @@ export async function generateWithRequestAction({
   try {
     const insertResult = await createRequest({
       ...requestData,
-      prompt: finalPrompt // store final prompt
+      language: selectedLanguage === "english" ? "eng" : "rus",
+      prompt: finalPrompt
     })
     newRequest = insertResult[0]
   } catch (error) {
@@ -131,7 +117,6 @@ export async function generateWithRequestAction({
     }
   }
 
-  // Re-check DB existence
   const recheck = await getRequestById(newRequest.id)
   if (!recheck) {
     console.error("[generateWithRequestAction] Request not found after insertion!")
@@ -150,7 +135,7 @@ export async function generateWithRequestAction({
       referencePost: generateInput.referencePost,
       info: generateInput.info,
       selectedModels: generateInput.selectedModels,
-      selectedPlatform: generateInput.selectedPlatform as "threads"|"telegram"|"threadofthreads", // type assertion if needed
+      selectedPlatform: generateInput.selectedPlatform as "threads"|"telegram"|"threadofthreads",
       prebuiltPrompt: finalPrompt
     })
   } catch (error) {

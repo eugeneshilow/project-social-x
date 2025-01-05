@@ -1,0 +1,1 @@
+ALTER TABLE "requests" ADD COLUMN "language" text DEFAULT 'rus' NOT NULL;
