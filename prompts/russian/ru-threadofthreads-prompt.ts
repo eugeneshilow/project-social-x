@@ -34,7 +34,7 @@ In the end of every post add 1 relevant #tag (make use of Russian tags as well l
 </threads-instructions>
 `
 
-export const threadOfThreadsPrompt = `${systemPrompt}
+export const threadofthreadsPrompt = `${systemPrompt}
 ${audiencePrompt}
 ${vocabularyPrompt}
 ${situationPrompt}
