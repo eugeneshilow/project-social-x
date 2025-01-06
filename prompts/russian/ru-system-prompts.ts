@@ -40,7 +40,7 @@ Finalize/revise headline after writing main text to better capture its essence *
 
 export const textBodyInstructions = `<textbody-instructions>
 - Follow Maxim Ilyakhov's "Пиши Сокращай" book principles, more on that in principles-write-cut. 
-- Also a meta-advice for you - write in the style this principles-write-cut are written
+- Also a meta-advice for you - write in the style principles-write-cut are written
 - Write in Russian (include English terms where appropriate)
 
 ${/* 
