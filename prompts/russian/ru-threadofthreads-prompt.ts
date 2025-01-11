@@ -31,6 +31,10 @@ Don't be lazy and output the answer in full. If it's a long list of items in ref
 
 In the end of every post add 1 relevant #tag (make use of Russian tags as well like #ИИ). Separate by an empty line before the tag.
 
+Add emojies 🧵 👇 in the first post.
+
+Let's create two version of Threads of Threads. One - close to the reference. Second - with more creative freedom.
+
 </threads-instructions>
 `
 

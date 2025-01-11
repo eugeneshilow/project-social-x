@@ -15,7 +15,10 @@ const threadsSpecificInstructions = `<threads-instructions>
 It will be posted on Threads: 
 - keep 500-character limit
 
-Offer 3 drastically different versions of the post (firstsentence + textbody). Make one version which must be maximally close to the reference but in Russian
+Offer 3 drastically different versions of the post (firstsentence + textbody). 
+- Make one version which must be maximally close to the reference but in Russian.
+- Second version must closely follow the principles-write-cut
+- Third version - be creative and write something completely different
 
 If there is some sort of CTA (like a link of something like that), mention it in the post (something like - "Ссылка в комментариях"),
 And make a second post with that CTA. 

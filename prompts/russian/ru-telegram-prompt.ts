@@ -25,6 +25,7 @@ Strikethrough: ~~Strikethrough text~~
 Monospace (inline code): \`Inline code\`
 Code Block: \`\`\` Multi-line code \`\`\`
 Hidden Text (to leverage curiousity): ||скрытый текст||
+Links: do not format links as links, just write the link right below the link name.
 
 Escape special chars:
 Use \\ before _, *, ~, etc., when you want them to appear literally (e.g. \\* becomes *).

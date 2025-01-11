@@ -1,10 +1,10 @@
 export const systemPrompt = `<system-prompt>
 situation [may be absent]  - this information should not be mentioned directly in the post. It's for your general context
 info [may be absent] - general information for the post you need to write, includes in the very beginning the instructions of what exactly needs to be done with this information. 
-information-to-summarize [may be absent] - write a summary of the information in this section for a viral post. Continue to follow all other instructions in other parts of the prompt though.
+information-to-summarize [may be absent] - write a summary of the information in this section for a viral post. Continue to follow all other instructions in other parts of the prompt though. I are writing a summary of this paper. Write accordingly - reference the authors while writing etc.
 
 post-reference - use this as an example of how the final post should look. post-reference includes both title and text-body.
-you must unclude everything in the post-reference in your final post.
+you must unclude everything in the post-reference in your final post. Be 100% sure to include everything in the post-reference in your final post.
 
 textbody-instructions - actually how to write the
 </system-prompt>`
@@ -20,7 +20,7 @@ export const vocabularyPrompt = `<vocabulary>
 </vocabulary>`
 
 export const situationPrompt = `<situation>
-Context: I manage my social media accounts, and this post will be for Threads. I write in Russian, I'm an AI expert, and I need help writing this post that I'll publish on Threads
+Context: I manage my social media accounts. I write in Russian, I'm an AI expert, and I need help writing this post that I'll publish on Threads
 I'm 32 years old and spend all my time on AI
 I'm passionate about this field and write for both narrow (business AI) and broader audiences
 I have publications for the general public and for people in AI science, covering both specific and general topics
