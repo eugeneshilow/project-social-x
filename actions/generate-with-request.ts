@@ -12,10 +12,11 @@ interface GenerateWithRequestParams {
   generateInput: {
     referencePost: string
     info: string
+    summarizeInfo?: string
+    shortvidReference?: string
     selectedModels: string[]
     selectedPlatform: string
     selectedLanguage: string
-    summarizeInfo?: string
   }
   finalPosts: { finalPostText: string; postedLink: string }[]
 }
@@ -99,12 +100,16 @@ export async function generateWithRequestAction({
     }
   }
 
+  // Decide if we want to include shortvid reference
+  const hasShortvidReference = Boolean(generateInput.shortvidReference && generateInput.shortvidReference.trim())
+
   // 2) Build final prompt
   const finalPrompt = buildPrompt(
     systemPrompt,
     generateInput.referencePost,
     generateInput.info,
-    generateInput.summarizeInfo || ""
+    generateInput.summarizeInfo || "",
+    hasShortvidReference ? generateInput.shortvidReference : ""
   )
 
   // 3) create request row with final prompt

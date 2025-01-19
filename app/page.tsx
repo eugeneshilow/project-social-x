@@ -20,6 +20,7 @@ export default function HomePage() {
   const [referencePost, setReferencePost] = useState("")
   const [info, setInfo] = useState("")
   const [summarizeInfo, setSummarizeInfo] = useState("")
+  const [shortvidReference, setShortvidReference] = useState("")
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageType>("russian")
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformType>("threads")
@@ -33,8 +34,9 @@ export default function HomePage() {
   async function handleGenerate(formData: {
     referencePost: string
     info: string
-    selectedModels: string[]
     summarizeInfo: string
+    shortvidReference: string
+    selectedModels: string[]
   }) {
     const requestData = {
       userId: "demo-user",
@@ -49,10 +51,11 @@ export default function HomePage() {
     const generateInput = {
       referencePost: formData.referencePost,
       info: formData.info,
+      summarizeInfo: formData.summarizeInfo,
+      shortvidReference: formData.shortvidReference,
       selectedModels: formData.selectedModels,
       selectedPlatform,
-      selectedLanguage,
-      summarizeInfo: formData.summarizeInfo
+      selectedLanguage
     }
 
     const resp = await generateWithRequestAction({
@@ -76,12 +79,14 @@ export default function HomePage() {
   function handleOnGenerate(formData: {
     referencePost: string
     info: string
-    selectedModels: string[]
     summarizeInfo: string
+    shortvidReference: string
+    selectedModels: string[]
   }) {
     setReferencePost(formData.referencePost)
     setInfo(formData.info)
     setSummarizeInfo(formData.summarizeInfo)
+    setShortvidReference(formData.shortvidReference)
     setSelectedModels(formData.selectedModels)
     setChatGPTOutput("")
     setClaudeOutput("")

@@ -6,8 +6,9 @@ interface InputsFormProps {
   onGenerate: (formData: {
     referencePost: string
     info: string
-    selectedModels: string[]
     summarizeInfo: string
+    shortvidReference: string
+    selectedModels: string[]
   }) => void
 }
 
@@ -15,6 +16,7 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
   const [localReferencePost, setLocalReferencePost] = useState("")
   const [localInfo, setLocalInfo] = useState("")
   const [summarizeInfo, setSummarizeInfo] = useState("")
+  const [shortvidReference, setShortvidReference] = useState("")
   const [selected, setSelected] = useState<string[]>([])
 
   useEffect(() => {
@@ -35,8 +37,9 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
     onGenerate({
       referencePost: localReferencePost,
       info: localInfo,
-      selectedModels: selected,
       summarizeInfo,
+      shortvidReference,
+      selectedModels: selected,
     })
   }
 
@@ -69,7 +72,6 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
           />
         </div>
 
-        {/* Summarize Info field */}
         <div>
           <label className="block mb-1 font-semibold">Summarize Info</label>
           <textarea
@@ -77,6 +79,18 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
             onChange={(e) => setSummarizeInfo(e.target.value)}
             className="w-full border border-gray-300 rounded p-2"
             placeholder="Enter content to be summarized..."
+            rows={3}
+          />
+        </div>
+
+        {/* Shortvid Reference field */}
+        <div>
+          <label className="block mb-1 font-semibold">Shortvid Reference</label>
+          <textarea
+            value={shortvidReference}
+            onChange={(e) => setShortvidReference(e.target.value)}
+            className="w-full border border-gray-300 rounded p-2"
+            placeholder="Optional: Enter the short video reference..."
             rows={3}
           />
         </div>
