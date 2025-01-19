@@ -12,7 +12,7 @@ import {
 } from "./ru-system-prompts";
 
 const reelsSpecificInstructions = `<reels-instructions>
-Be 100% sure to write in Russian!!
+Be 100% sure to write in Russian!! Write a Instagram Reels script following these instructions:
 
 ### **Структура ролика**
 
@@ -174,7 +174,7 @@ export function buildReelsPrompt(options: PromptOptions = {}): string {
     includeSystem = true,
     includeAudience = false,
     includeVocabulary = false,
-    includeSituation = true,
+    includeSituation = false,
     includeTitle = false,
     includeTextBody = false,
     includePrinciples = true,

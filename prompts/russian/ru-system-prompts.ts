@@ -1,4 +1,30 @@
+export const postReferenceInstructions = `<post-reference-instructions>
+- Use the post-reference as an example of how the final post should look
+- Post-reference includes both title and text-body
+- You must include everything in the post-reference in your final post
+- Be 100% sure to include everything in the post-reference in your final post
+</post-reference-instructions>`
+
+export const infoInstructions = `<info-instructions>
+- Use the info section to understand what needs to be done with the content
+- Info section contains specific instructions about the task
+- Info section may include context, requirements, and constraints
+- Always follow the instructions provided in the info section first
+</info-instructions>`
+
+export const summarizeInstructions = `<summarize-instructions>
+- Create a viral-style summary of the provided information
+- Keep the academic/professional tone while making it engaging
+- Reference authors and sources appropriately
+- Focus on key insights and findings
+- Make complex information accessible to a general audience
+- Maintain scientific accuracy while simplifying concepts
+</summarize-instructions>`
+
 export const systemPrompt = `<system-prompt>
+${postReferenceInstructions}
+${infoInstructions}
+${summarizeInstructions}
 - you are writing for Russian-speaking audience
 </system-prompt>`
 
@@ -306,17 +332,14 @@ export const principlesWriteCut = `<principles-write-cut>
 </principles-write-cut>`
 
 export const defaultInfo = `<info>
-general information for the post you need to write, includes in the very beginning the instructions of what exactly needs to be done with this information. 
+// The actual info and instructions go here
 </info>`
 
 export const defaultPostReference = `<post-reference>
-use this as an example of how the final post should look. post-reference includes both title and text-body.
-you must unclude everything in the post-reference in your final post. Be 100% sure to include everything in the post-reference in your final post.
-
+// The actual post content goes here
 </post-reference>`
 
 export const defaultInformationToSummarize = `<information-to-summarize>
-write a summary of the information in this section for a viral post. Continue to follow all other instructions in other parts of the prompt though. I are writing a summary of this paper. Write accordingly - reference the authors while writing etc.
-
+// The actual content to summarize goes here
 </information-to-summarize>` 
 
