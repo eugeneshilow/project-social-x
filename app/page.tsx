@@ -13,7 +13,8 @@ type PlatformType =
   | "threadofthreads" 
   | "zen-article" 
   | "zen-post"
-  | "linkedin" // etc. add more as needed
+  | "linkedin"
+  | "reels"  // <-- ADDED "reels"
 
 export default function HomePage() {
   const [referencePost, setReferencePost] = useState("")
@@ -120,10 +121,10 @@ export default function HomePage() {
             <option value="zen-article">Zen Article Prompt</option>
             <option value="zen-post">Zen Post Prompt</option>
             <option value="linkedin">LinkedIn Prompt</option>
+            <option value="reels">Reels Prompt</option>  {/* ADDED THIS */}
           </select>
         </div>
 
-        {/* Existing inputs form */}
         <InputsForm onGenerate={handleOnGenerate} />
       </div>
 

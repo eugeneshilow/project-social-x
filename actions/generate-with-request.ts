@@ -51,6 +51,9 @@ export async function generateWithRequestAction({
       } else if (selectedPlatform === "zen-post") {
         const { zenPostPrompt } = await import("@/prompts/russian/ru-zen-post-prompt")
         systemPrompt = zenPostPrompt
+      } else if (selectedPlatform === "reels") {
+        const { reelsPrompt } = await import("@/prompts/russian/ru-reels-prompts")
+        systemPrompt = reelsPrompt
       } else if (selectedPlatform === "linkedin") {
         console.log("[generateWithRequestAction] Russian + LinkedIn => fallback to threads prompt")
         const { threadsPrompt } = await import("@/prompts/russian/ru-threads-prompt")
