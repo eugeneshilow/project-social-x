@@ -11,8 +11,15 @@ import {
     vocabularyPrompt,
 } from "./ru-system-prompts";
 
+/**
+ * Default shortvid reference placeholder
+ */
+export const defaultShortvidReference = `<shortvid-reference> - use this text to use as a reference point to instagram reels script. 
+// The shortvid reference content goes here
+</shortvid-reference>`
+
 const reelsSpecificInstructions = `<reels-instructions>
-Be 100% sure to write in Russian!! Write a Instagram Reels script following these instructions:
+Be 100% sure to write in Russian!! Write a Instagram Reels script based on the shortvidreference following these instructions:
 
 ### **Структура ролика**
 
@@ -153,7 +160,7 @@ Be 100% sure to write in Russian!! Write a Instagram Reels script following thes
 3. Решение 
 4. И какую выгоду он получит от этого решение
 
-</reels-instructions>`;
+</reels-instructions>`
 
 interface PromptOptions {
   includeSystem?: boolean;
@@ -167,22 +174,27 @@ interface PromptOptions {
   includeDefaultInfo?: boolean;
   includeDefaultSummary?: boolean;
   includeDefaultReference?: boolean;
+  /**
+   * If true, inject shortvid reference (via defaultShortvidReference).
+   */
+  includeDefaultShortvidReference?: boolean;
 }
 
 export function buildReelsPrompt(options: PromptOptions = {}): string {
   const {
-    includeSystem = true,
+    includeSystem = false,
     includeAudience = false,
     includeVocabulary = false,
     includeSituation = false,
     includeTitle = false,
     includeTextBody = false,
-    includePrinciples = true,
+    includePrinciples = false,
     includeReelsSpecific = true,
-    includeDefaultInfo = true,
-    includeDefaultSummary = true,
-    includeDefaultReference = true,
-  } = options;
+    includeDefaultInfo = false,
+    includeDefaultSummary = false,
+    includeDefaultReference = false,
+    includeDefaultShortvidReference = true
+  } = options
 
   return [
     includeSystem && systemPrompt,
@@ -196,9 +208,10 @@ export function buildReelsPrompt(options: PromptOptions = {}): string {
     includeDefaultInfo && defaultInfo,
     includeDefaultSummary && defaultInformationToSummarize,
     includeDefaultReference && defaultPostReference,
+    includeDefaultShortvidReference && defaultShortvidReference
   ]
     .filter(Boolean)
-    .join('\n');
+    .join("\n")
 }
 
 // For backward compatibility
