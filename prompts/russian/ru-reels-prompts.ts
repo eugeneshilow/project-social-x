@@ -1,17 +1,19 @@
 import {
-  audiencePrompt,
-  defaultInfo,
-  defaultInformationToSummarize,
-  defaultPostReference,
-  principlesWriteCut,
-  situationPrompt,
-  systemPrompt,
-  textBodyInstructions,
-  titleInstructions,
-  vocabularyPrompt,
+    audiencePrompt,
+    defaultInfo,
+    defaultInformationToSummarize,
+    defaultPostReference,
+    principlesWriteCut,
+    situationPrompt,
+    systemPrompt,
+    textBodyInstructions,
+    titleInstructions,
+    vocabularyPrompt,
 } from "./ru-system-prompts";
 
 const reelsSpecificInstructions = `<reels-instructions>
+Be 100% sure to write in Russian!!
+
 ### **Структура ролика**
 
 1. **Заголовок**
@@ -143,16 +145,61 @@ const reelsSpecificInstructions = `<reels-instructions>
     - Старая информация, поданная по-новому.
     - Новый взгляд на общепринятую и доступную информацию.
 
+Не надо добавлять всякие лишние инстркуции по записи, пиши только скрипт и его структуру (где хук, заголовок, призыв, решение и тп)
+
+В конце давай добавим второй скрипт по рилсу в чуть другой структуре: 
+1. Заголовок который бьет в боль
+2. Причина боли
+3. Решение 
+4. И какую выгоду он получит от этого решение
+
 </reels-instructions>`;
 
-export const reelsPrompt = `${systemPrompt}
-${audiencePrompt}
-${vocabularyPrompt}
-${situationPrompt}
-${titleInstructions}
-${textBodyInstructions}
-${principlesWriteCut}
-${reelsSpecificInstructions}
-${defaultInfo}
-${defaultInformationToSummarize}
-${defaultPostReference}`;
+interface PromptOptions {
+  includeSystem?: boolean;
+  includeAudience?: boolean;
+  includeVocabulary?: boolean;
+  includeSituation?: boolean;
+  includeTitle?: boolean;
+  includeTextBody?: boolean;
+  includePrinciples?: boolean;
+  includeReelsSpecific?: boolean;
+  includeDefaultInfo?: boolean;
+  includeDefaultSummary?: boolean;
+  includeDefaultReference?: boolean;
+}
+
+export function buildReelsPrompt(options: PromptOptions = {}): string {
+  const {
+    includeSystem = true,
+    includeAudience = false,
+    includeVocabulary = false,
+    includeSituation = true,
+    includeTitle = false,
+    includeTextBody = false,
+    includePrinciples = true,
+    includeReelsSpecific = true,
+    includeDefaultInfo = true,
+    includeDefaultSummary = true,
+    includeDefaultReference = true,
+  } = options;
+
+  return [
+    includeSystem && systemPrompt,
+    includeAudience && audiencePrompt,
+    includeVocabulary && vocabularyPrompt,
+    includeSituation && situationPrompt,
+    includeTitle && titleInstructions,
+    includeTextBody && textBodyInstructions,
+    includePrinciples && principlesWriteCut,
+    includeReelsSpecific && reelsSpecificInstructions,
+    includeDefaultInfo && defaultInfo,
+    includeDefaultSummary && defaultInformationToSummarize,
+    includeDefaultReference && defaultPostReference,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+// For backward compatibility
+export const reelsPrompt = buildReelsPrompt();

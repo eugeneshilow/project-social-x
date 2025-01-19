@@ -3,14 +3,13 @@
 import { fetchFromGemini } from "@/lib/gemini"
 import { fetchFromChatGPT } from "@/lib/puppeteer-chatgpt"
 import { fetchFromClaude } from "@/lib/puppeteer-claude"
+import { fetchFromClaudeApi } from "@/lib/claude"
 
 interface GenerateParams {
   referencePost: string
   info: string
   selectedModels: string[]
   selectedPlatform: "threads" | "telegram" | "threadofthreads"
-
-  // New: we already built the final prompt in generateWithRequestAction
   prebuiltPrompt: string
 }
 
@@ -26,15 +25,15 @@ export async function generateAction({
     info,
     selectedModels,
     selectedPlatform,
-    prebuiltPromptLen: prebuiltPrompt?.length
+    prebuiltPromptLen: prebuiltPrompt?.length,
   })
 
-  // Instead of building a new prompt, reuse prebuiltPrompt
   const finalPrompt = prebuiltPrompt
 
   let chatGPTOutput = ""
   let claudeOutput = ""
   let geminiOutput = ""
+  let claudeApiOutput = ""
 
   // ChatGPT (via Puppeteer)
   if (selectedModels.includes("chatgpt")) {
@@ -59,10 +58,17 @@ export async function generateAction({
     }
   }
 
+  // Claude API (official)
+  if (selectedModels.includes("claudeAPI")) {
+    console.log("[generateAction] User selected Claude API, calling fetchFromClaudeApi...")
+    claudeApiOutput = await fetchFromClaudeApi(finalPrompt)
+  }
+
   return {
     finalPrompt,
     chatGPTOutput,
     claudeOutput,
-    geminiOutput
+    geminiOutput,
+    claudeApiOutput,
   }
 }

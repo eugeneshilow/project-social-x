@@ -7,12 +7,14 @@ interface OutputsSectionProps {
   chatGPTOutput: string
   claudeOutput: string
   geminiOutput: string
+  claudeApiOutput?: string
 }
 
 export default function OutputsSection({
   chatGPTOutput,
   claudeOutput,
-  geminiOutput
+  geminiOutput,
+  claudeApiOutput = ""
 }: OutputsSectionProps) {
 
   function parseLLMOutput(output: string) {
@@ -28,6 +30,7 @@ export default function OutputsSection({
   const chatGPT = parseLLMOutput(chatGPTOutput)
   const claude = parseLLMOutput(claudeOutput)
   const gemini = parseLLMOutput(geminiOutput)
+  const claudeApi = parseLLMOutput(claudeApiOutput)
 
   return (
     <div className="mx-auto w-full max-w-screen-2xl px-8 py-6 border rounded-md shadow-sm">
@@ -59,9 +62,9 @@ export default function OutputsSection({
         </div>
       </div>
 
-      {/* Claude */}
+      {/* Claude (Puppeteer) */}
       <div className="mb-8">
-        <h3 className="font-semibold mb-2">Claude Output</h3>
+        <h3 className="font-semibold mb-2">Claude (Puppeteer) Output</h3>
         <div className="grid grid-cols-2 gap-4">
           <div className="p-2 border border-gray-300 rounded">
             <p className="text-sm font-bold mb-1">Raw</p>
@@ -103,6 +106,32 @@ export default function OutputsSection({
                 className="prose prose-lg max-w-none leading-relaxed space-y-4"
               >
                 {gemini.strippedText}
+              </ReactMarkdown>
+            ) : (
+              <p>No output</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Claude API */}
+      <div className="mb-8">
+        <h3 className="font-semibold mb-2">Claude API Output</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-2 border border-gray-300 rounded">
+            <p className="text-sm font-bold mb-1">Raw</p>
+            <p className="leading-relaxed whitespace-pre-wrap">
+              {claudeApi.rawHTML || "No output"}
+            </p>
+          </div>
+          <div className="p-2 border border-gray-300 rounded">
+            <p className="text-sm font-bold mb-1">Markdown</p>
+            {claudeApi.strippedText ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                className="prose prose-lg max-w-none leading-relaxed space-y-4"
+              >
+                {claudeApi.strippedText}
               </ReactMarkdown>
             ) : (
               <p>No output</p>

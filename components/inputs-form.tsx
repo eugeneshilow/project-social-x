@@ -36,7 +36,7 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
       referencePost: localReferencePost,
       info: localInfo,
       selectedModels: selected,
-      summarizeInfo
+      summarizeInfo,
     })
   }
 
@@ -83,7 +83,7 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
 
         <div>
           <p className="font-semibold mb-2">Select Model(s):</p>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -99,7 +99,7 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
                 onChange={() => handleCheckboxChange("claude")}
                 checked={selected.includes("claude")}
               />
-              <span>Claude</span>
+              <span>Claude (Puppeteer)</span>
             </label>
 
             <label className="flex items-center gap-2">
@@ -109,6 +109,16 @@ export default function InputsForm({ onGenerate }: InputsFormProps) {
                 checked={selected.includes("gemini")}
               />
               <span>Gemini</span>
+            </label>
+
+            {/* New Claude API */}
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                onChange={() => handleCheckboxChange("claudeAPI")}
+                checked={selected.includes("claudeAPI")}
+              />
+              <span>Claude API</span>
             </label>
           </div>
         </div>

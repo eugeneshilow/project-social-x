@@ -14,7 +14,7 @@ type PlatformType =
   | "zen-article" 
   | "zen-post"
   | "linkedin"
-  | "reels"  // <-- ADDED "reels"
+  | "reels"
 
 export default function HomePage() {
   const [referencePost, setReferencePost] = useState("")
@@ -27,6 +27,7 @@ export default function HomePage() {
   const [chatGPTOutput, setChatGPTOutput] = useState("")
   const [claudeOutput, setClaudeOutput] = useState("")
   const [geminiOutput, setGeminiOutput] = useState("")
+  const [claudeApiOutput, setClaudeApiOutput] = useState("")
   const [serverRequestId, setServerRequestId] = useState("")
 
   async function handleGenerate(formData: {
@@ -69,6 +70,7 @@ export default function HomePage() {
     setChatGPTOutput(resp.data?.generation.chatGPTOutput || "")
     setClaudeOutput(resp.data?.generation.claudeOutput || "")
     setGeminiOutput(resp.data?.generation.geminiOutput || "")
+    setClaudeApiOutput(resp.data?.generation.claudeApiOutput || "")
   }
 
   function handleOnGenerate(formData: {
@@ -84,6 +86,7 @@ export default function HomePage() {
     setChatGPTOutput("")
     setClaudeOutput("")
     setGeminiOutput("")
+    setClaudeApiOutput("")
     setServerRequestId("")
 
     void handleGenerate(formData)
@@ -121,7 +124,7 @@ export default function HomePage() {
             <option value="zen-article">Zen Article Prompt</option>
             <option value="zen-post">Zen Post Prompt</option>
             <option value="linkedin">LinkedIn Prompt</option>
-            <option value="reels">Reels Prompt</option>  {/* ADDED THIS */}
+            <option value="reels">Reels Prompt</option>
           </select>
         </div>
 
@@ -132,6 +135,7 @@ export default function HomePage() {
         chatGPTOutput={chatGPTOutput}
         claudeOutput={claudeOutput}
         geminiOutput={geminiOutput}
+        claudeApiOutput={claudeApiOutput}
       />
 
       <ResultsSection

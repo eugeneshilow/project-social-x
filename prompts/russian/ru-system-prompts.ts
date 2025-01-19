@@ -1,12 +1,5 @@
 export const systemPrompt = `<system-prompt>
-situation [may be absent]  - this information should not be mentioned directly in the post. It's for your general context
-info [may be absent] - general information for the post you need to write, includes in the very beginning the instructions of what exactly needs to be done with this information. 
-information-to-summarize [may be absent] - write a summary of the information in this section for a viral post. Continue to follow all other instructions in other parts of the prompt though. I are writing a summary of this paper. Write accordingly - reference the authors while writing etc.
-
-post-reference - use this as an example of how the final post should look. post-reference includes both title and text-body.
-you must unclude everything in the post-reference in your final post. Be 100% sure to include everything in the post-reference in your final post.
-
-textbody-instructions - actually how to write the
+- you are writing for Russian-speaking audience
 </system-prompt>`
 
 export const audiencePrompt = `<audience>
@@ -20,6 +13,8 @@ export const vocabularyPrompt = `<vocabulary>
 </vocabulary>`
 
 export const situationPrompt = `<situation>
+This information should not be mentioned directly in the post. It's for your general context:
+
 Context: I manage my social media accounts. I write in Russian, I'm an AI expert, and I need help writing this post that I'll publish on Threads
 I'm 32 years old and spend all my time on AI
 I'm passionate about this field and write for both narrow (business AI) and broader audiences
@@ -311,11 +306,17 @@ export const principlesWriteCut = `<principles-write-cut>
 </principles-write-cut>`
 
 export const defaultInfo = `<info>
+general information for the post you need to write, includes in the very beginning the instructions of what exactly needs to be done with this information. 
 </info>`
 
 export const defaultPostReference = `<post-reference>
+use this as an example of how the final post should look. post-reference includes both title and text-body.
+you must unclude everything in the post-reference in your final post. Be 100% sure to include everything in the post-reference in your final post.
+
 </post-reference>`
 
 export const defaultInformationToSummarize = `<information-to-summarize>
+write a summary of the information in this section for a viral post. Continue to follow all other instructions in other parts of the prompt though. I are writing a summary of this paper. Write accordingly - reference the authors while writing etc.
+
 </information-to-summarize>` 
 
