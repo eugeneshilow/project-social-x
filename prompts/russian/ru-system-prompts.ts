@@ -39,12 +39,12 @@ export const vocabularyPrompt = `<vocabulary>
 </vocabulary>`
 
 export const situationPrompt = `<situation>
-This information should not be mentioned directly in the post. It's for your general context:
+This information doesn't have to be be mentioned directly in the post. It's for your general context:
 
-Context: I manage my social media accounts. I write in Russian, I'm an AI expert, and I need help writing this post that I'll publish on Threads
+Context: I manage my social media accounts. My name in Евгений Шилов. I write in Russian, I'm an AI expert.
 I'm 32 years old and spend all my time on AI
 I'm passionate about this field and write for both narrow (business AI) and broader audiences
-I have publications for the general public and for people in AI science, covering both specific and general topics
+I write and record videos for both general public and for people in AI science, covering both specific and general topics
 This is general background about me
 </situation>`
 

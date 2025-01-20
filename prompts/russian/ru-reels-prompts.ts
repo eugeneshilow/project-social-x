@@ -154,13 +154,39 @@ Be 100% sure to write in Russian!! Write a Instagram Reels script based on the s
 
 Не надо добавлять всякие лишние инстркуции по записи, пиши только скрипт и его структуру (где хук, заголовок, призыв, решение и тп)
 
-В конце давай добавим второй скрипт по рилсу в чуть другой структуре: 
+</reels-instructions>`
+
+const timInstructions = `<tim-instructions>
+Be 100% sure to write in Russian!! Write a Instagram Reels script based on the shortvidreference following these instructions:
+
+Структура рилса: 
 1. Заголовок который бьет в боль
 2. Причина боли
 3. Решение 
 4. И какую выгоду он получит от этого решение
 
-</reels-instructions>`
+
+Важные правила для создания рилсов:
+
+1. Начинай с сильного заголовка-вопроса
+- Добавляй конкретику (цифры, сроки, результаты)
+
+2. Основная часть должна быть:
+- Короткой (20-30 секунд)
+- Структурированной (пункты 1,2,3)
+- С конкретными примерами
+- Без воды и общих фраз
+
+3. В конце фраза в духе:
+- "у меня в профиле больше про технологии."
+
+4. Общие правила:
+- Пиши простым разговорным языком
+- Используй короткие предложения
+- Добавляй эмоции через восклицательные знаки
+- Избегай сложных терминов
+
+</tim-instructions>`
 
 interface PromptOptions {
   includeSystem?: boolean;
@@ -178,6 +204,7 @@ interface PromptOptions {
    * If true, inject shortvid reference (via defaultShortvidReference).
    */
   includeDefaultShortvidReference?: boolean;
+  includeTimInstructions?: boolean;
 }
 
 export function buildReelsPrompt(options: PromptOptions = {}): string {
@@ -185,15 +212,16 @@ export function buildReelsPrompt(options: PromptOptions = {}): string {
     includeSystem = false,
     includeAudience = false,
     includeVocabulary = false,
-    includeSituation = false,
+    includeSituation = true,
     includeTitle = false,
     includeTextBody = false,
-    includePrinciples = false,
-    includeReelsSpecific = true,
-    includeDefaultInfo = false,
+    includePrinciples = true,
+    includeReelsSpecific = false,
+    includeDefaultInfo = true,
     includeDefaultSummary = false,
     includeDefaultReference = false,
-    includeDefaultShortvidReference = true
+    includeDefaultShortvidReference = true,
+    includeTimInstructions = true
   } = options
 
   return [
@@ -208,7 +236,8 @@ export function buildReelsPrompt(options: PromptOptions = {}): string {
     includeDefaultInfo && defaultInfo,
     includeDefaultSummary && defaultInformationToSummarize,
     includeDefaultReference && defaultPostReference,
-    includeDefaultShortvidReference && defaultShortvidReference
+    includeDefaultShortvidReference && defaultShortvidReference,
+    includeTimInstructions && timInstructions
   ]
     .filter(Boolean)
     .join("\n")
